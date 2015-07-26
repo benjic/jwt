@@ -18,21 +18,31 @@ package jwt
 import (
 	"bufio"
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
 	"errors"
 	"io"
-	"strings"
+	"time"
 )
-import (
-	"encoding/base64"
-	"encoding/json"
-)
+import "encoding/json"
 
 var (
-	errMalformedContent = errors.New("Malformed Content")
-	errBadSignature     = errors.New("Mismatched Signature")
+	// ErrMalformedToken represent errors where the given JWT is improperly formed
+	ErrMalformedToken = errors.New("Malformed Content")
 )
+
+// Header is a preamble in a JWT
+type Header interface{}
+
+// A Payload in a JWT represents a set of claims for a given token.
+type Payload struct {
+	Issuer         string    `json:"iss"`
+	Subject        string    `json:"sub"`
+	Audience       string    `json:"aud"`
+	ExpirationTime time.Time `json:"exp"`
+	NotBefore      time.Time `json:"nbf"`
+	IssuedAt       time.Time `json:"iat"`
+	JWTId          string    `json:"jti"`
+	raw            []byte
+}
 
 // JWSDecoder is a JSON Web Signature
 type JWSDecoder struct {
@@ -40,39 +50,25 @@ type JWSDecoder struct {
 	key    []byte
 }
 
-type jws struct {
-	JOSE, Payload, Signature []byte
-}
-
-func newjws(input string) (*jws, error) {
+func NewJWTPayload(raw string, v interface{}) (*Payload, error) {
 	var err error
-	jwt := &jws{}
+	var value []byte
+	payload := &Payload{raw: []byte(raw)}
 
-	fields := strings.Split(input, ".")
-
-	if len(fields) != 3 {
-		return jwt, errMalformedContent
+	if value, err = parseField(raw); err != nil {
+		return payload, err
 	}
 
-	if jwt.JOSE, err = base64.URLEncoding.DecodeString(
-		addBase64Padding(fields[0])); err != nil {
-		return jwt, err
-	}
-	if jwt.Payload, err = base64.URLEncoding.DecodeString(
-		addBase64Padding(fields[1])); err != nil {
-		return jwt, err
-	}
-	if jwt.Signature, err = base64.URLEncoding.DecodeString(
-		addBase64Padding(fields[2])); err != nil {
-		return jwt, err
+	if err := json.NewDecoder(bytes.NewReader(value)).Decode(v); err != nil {
+		return payload, err
 	}
 
-	return jwt, nil
+	return payload, nil
 }
 
 // NewJWSDecoder creates a mechanism for verifying a given jws
-func NewJWSDecoder(r io.Reader) *JWSDecoder {
-	JWSDecoder := &JWSDecoder{reader: r}
+func NewJWSDecoder(r io.Reader, key []byte) *JWSDecoder {
+	JWSDecoder := &JWSDecoder{reader: r, key: key}
 	return JWSDecoder
 }
 
@@ -84,36 +80,18 @@ func (dec *JWSDecoder) Decode(v interface{}) error {
 	input, err := buf.ReadString(byte(' '))
 
 	if err != nil && err != io.EOF {
-		return errMalformedContent
+		return ErrMalformedToken
 	}
 
-	jwt, err := newjws(input)
+	jwt, err := NewJWS(input, v)
 
 	if err != nil {
 		return err
 	}
 
-	if jwt.hasValidSignature([]byte("secret")) {
-		return json.NewDecoder(bytes.NewReader(jwt.Payload)).Decode(v)
+	if !jwt.ValidateSignature(dec.key) {
+		return ErrBadSignature
 	}
 
-	return errBadSignature
-}
-
-func (jws *jws) hasValidSignature(key []byte) bool {
-
-	b64JOSE := base64.StdEncoding.EncodeToString(jws.JOSE)
-	b64Payload := base64.StdEncoding.EncodeToString(jws.Payload)
-
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(b64JOSE + "." + b64Payload))
-
-	return hmac.Equal(jws.Signature, mac.Sum(nil))
-}
-
-func addBase64Padding(encoded string) string {
-	if m := len(encoded) % 4; m != 0 {
-		encoded += strings.Repeat("=", 4-m)
-	}
-	return encoded
+	return nil
 }

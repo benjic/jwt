@@ -19,15 +19,21 @@ import (
 )
 
 const (
-	validjwsToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+	validJWSToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
 )
 
 type TestPayload struct {
+	Name  string `json:"name"`
+	Admin bool   `json:"admin"`
+}
+
+type RegisteredClaimPayload struct {
+	Payload
 	Name string `json:"name"`
 }
 
 func TestJWTToken(t *testing.T) {
-	decoder := NewJWSDecoder(bytes.NewBufferString(validjwsToken))
+	decoder := NewJWSDecoder(bytes.NewBufferString(validJWSToken), []byte("secret"))
 	payload := new(TestPayload)
 
 	err := decoder.Decode(payload)
@@ -38,5 +44,22 @@ func TestJWTToken(t *testing.T) {
 
 	if payload.Name != "John Doe" {
 		t.Errorf("Invalid name from payload: %s", payload.Name)
+	}
+
+	if !payload.Admin {
+		t.Errorf("Invalid admin claim, expected %t got %t", true, payload.Admin)
+	}
+}
+
+func TestRegisteredClaims(t *testing.T) {
+	decoder := NewJWSDecoder(bytes.NewBufferString(validJWSToken), []byte("secret"))
+	payload := new(RegisteredClaimPayload)
+
+	if err := decoder.Decode(payload); err != nil {
+		t.Errorf("Expected validJWSToken to not throw error, got: %s", err)
+	}
+
+	if payload.Subject != "1234567890" {
+		t.Errorf("Expected Registered Claim \"sub\": 1234567890, got %s", payload.Subject)
 	}
 }
