@@ -15,7 +15,24 @@
 // Package jwt a simple library for encoding and decoding JSON Web Tokens
 package jwt
 
-import "io"
+import (
+	"bufio"
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"errors"
+	"io"
+	"strings"
+)
+import (
+	"encoding/base64"
+	"encoding/json"
+)
+
+var (
+	errMalformedContent = errors.New("Malformed Content")
+	errBadSignature     = errors.New("Mismatched Signature")
+)
 
 // JWSDecoder is a JSON Web Signature
 type JWSDecoder struct {
@@ -23,15 +40,80 @@ type JWSDecoder struct {
 	key    []byte
 }
 
-// NewJWSDecoder creates a mechanism for verifying a given JWS
-func NewJWSDecoder(r io.Reader, key []byte) *JWSDecoder {
-	jwsDecoder := &JWSDecoder{reader: r, key: key}
-	return jwsDecoder
+type jws struct {
+	JOSE, Payload, Signature []byte
+}
+
+func newjws(input string) (*jws, error) {
+	var err error
+	jwt := &jws{}
+
+	fields := strings.Split(input, ".")
+
+	if len(fields) != 3 {
+		return jwt, errMalformedContent
+	}
+
+	if jwt.JOSE, err = base64.URLEncoding.DecodeString(
+		addBase64Padding(fields[0])); err != nil {
+		return jwt, err
+	}
+	if jwt.Payload, err = base64.URLEncoding.DecodeString(
+		addBase64Padding(fields[1])); err != nil {
+		return jwt, err
+	}
+	if jwt.Signature, err = base64.URLEncoding.DecodeString(
+		addBase64Padding(fields[2])); err != nil {
+		return jwt, err
+	}
+
+	return jwt, nil
+}
+
+// NewJWSDecoder creates a mechanism for verifying a given jws
+func NewJWSDecoder(r io.Reader) *JWSDecoder {
+	JWSDecoder := &JWSDecoder{reader: r}
+	return JWSDecoder
 }
 
 // Decode processes the next JWT from the input and stores it in the value pointed
 // to by v.
 func (dec *JWSDecoder) Decode(v interface{}) error {
 
-	return nil
+	buf := bufio.NewReader(dec.reader)
+	input, err := buf.ReadString(byte(' '))
+
+	if err != nil && err != io.EOF {
+		return errMalformedContent
+	}
+
+	jwt, err := newjws(input)
+
+	if err != nil {
+		return err
+	}
+
+	if jwt.hasValidSignature([]byte("secret")) {
+		return json.NewDecoder(bytes.NewReader(jwt.Payload)).Decode(v)
+	}
+
+	return errBadSignature
+}
+
+func (jws *jws) hasValidSignature(key []byte) bool {
+
+	b64JOSE := base64.StdEncoding.EncodeToString(jws.JOSE)
+	b64Payload := base64.StdEncoding.EncodeToString(jws.Payload)
+
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(b64JOSE + "." + b64Payload))
+
+	return hmac.Equal(jws.Signature, mac.Sum(nil))
+}
+
+func addBase64Padding(encoded string) string {
+	if m := len(encoded) % 4; m != 0 {
+		encoded += strings.Repeat("=", 4-m)
+	}
+	return encoded
 }
