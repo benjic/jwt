@@ -14,6 +14,15 @@
 
 package jwt
 
+import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"strings"
+)
+
 const (
 	// TODO: Implement more algorithms
 	hs256 = "hs256"
@@ -29,6 +38,7 @@ type Validator interface {
 }
 
 type NoneValidator struct{}
+type hs256Validator struct{}
 
 func (v NoneValidator) Validate(jws *JWS, key []byte) (bool, error) {
 	// NOOP Validation :-1:
@@ -36,6 +46,43 @@ func (v NoneValidator) Validate(jws *JWS, key []byte) (bool, error) {
 }
 
 func (v NoneValidator) Sign(jws *JWS, key []byte) ([]byte, error) {
+
+	jws.Header.Algorithm = none
+
 	// NOOP Signing :-1:
 	return []byte(""), nil
+}
+
+func (v hs256Validator) Validate(jws *JWS, key []byte) (bool, error) {
+	signature, _ := base64.StdEncoding.DecodeString(addBase64Padding(string(jws.Signature)))
+
+	magicString := string(jws.Header.raw) + "." + string(jws.Payload.raw)
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(magicString))
+
+	return hmac.Equal(signature, mac.Sum(nil)), nil
+}
+
+func (v hs256Validator) Sign(jws *JWS, key []byte) ([]byte, error) {
+
+	jws.Header.Algorithm = hs256
+
+	headerBuf := bytes.NewBuffer(nil)
+	payloadBuf := bytes.NewBuffer(nil)
+
+	if err := json.NewEncoder(headerBuf).Encode(jws.Header); err != nil {
+		return []byte(nil), err
+	}
+
+	if err := json.NewEncoder(payloadBuf).Encode(jws.Payload); err != nil {
+		return []byte(nil), err
+	}
+
+	b64Header := strings.Trim(base64.URLEncoding.EncodeToString(headerBuf.Bytes()), "=")
+	b64Payload := strings.Trim(base64.URLEncoding.EncodeToString(payloadBuf.Bytes()), "=")
+
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(b64Header + "." + b64Payload))
+
+	return mac.Sum(nil), nil
 }
