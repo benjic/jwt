@@ -16,20 +16,10 @@ package jwt
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
-)
-
-type algorithm string
-
-const (
-	// TODO: Implement more algorithms
-	hs256 = "hs256"
-	none  = "none"
 )
 
 var (
@@ -90,14 +80,22 @@ func NewJWS(input string, payload interface{}) (*JWS, error) {
 	return jws, nil
 }
 
-func (jws *JWS) ValidateSignature(key []byte) bool {
-	signature, _ := base64.StdEncoding.DecodeString(addBase64Padding(string(jws.Signature)))
+// ValidateSignature uses the header of a given JWS to determine a the signing algorithm
+// and validates it. Can return an errAlgorithmNotImplemented if using a not yet implemented
+// signing method.
+func (jws *JWS) ValidateSignature(key []byte) (bool, error) {
+	var validator Validator
 
-	magicString := string(jws.Header.raw) + "." + string(jws.Payload.raw)
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(magicString))
+	switch jws.Header.Algorithm {
+	case hs256:
+		// TODO: Add hs256 validator
+	case none:
+		validator = NoneValidator{}
+	default:
+		return false, nil
+	}
 
-	return hmac.Equal(signature, mac.Sum(nil))
+	return validator.Validate(jws, key)
 }
 
 func parseField(b64Value string) ([]byte, error) {

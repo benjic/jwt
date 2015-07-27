@@ -89,7 +89,7 @@ func (dec *JWSDecoder) Decode(v interface{}) error {
 		return err
 	}
 
-	if !jwt.ValidateSignature(dec.key) {
+	if valid, err := jwt.ValidateSignature(dec.key); !valid || err != nil {
 		return ErrBadSignature
 	}
 
