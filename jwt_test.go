@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	validJWSToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+	validJWSToken     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+	generatedJWSToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIn0=.PJ5rUFTxZU5_qAS0yI5jdmoMHAD-lio-ZiNh2qOQqj0="
 )
 
 type TestPayload struct {
@@ -61,5 +62,21 @@ func TestRegisteredClaims(t *testing.T) {
 
 	if payload.Subject != "1234567890" {
 		t.Errorf("Expected Registered Claim \"sub\": 1234567890, got %s", payload.Subject)
+	}
+}
+
+func TestJWSEncoder(t *testing.T) {
+
+	payload := &Payload{Subject: "1234567890", Issuer: "Ben Campbell"}
+
+	buf := bytes.NewBuffer(nil)
+	enc := NewJWSEncoder(buf, []byte("bogokey"))
+
+	if err := enc.Encode(payload, HS256); err != nil {
+		t.Errorf("Got error encoding token: %s", err)
+	}
+
+	if buf.String() != generatedJWSToken {
+		t.Errorf("Invalid Token:\n%s\n%s", buf.String(), generatedJWSToken)
 	}
 }

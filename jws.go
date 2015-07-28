@@ -19,12 +19,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 )
 
 var (
 	// ErrBadSignature represents errors where a signature is invalid
-	ErrBadSignature = errors.New("Invalid Signature")
+	ErrBadSignature            = errors.New("Invalid Signature")
+	ErrAlgorithmNotImplemented = errors.New("Requested algorithm is not implemented")
 )
 
 // A JWSHeader contains data related to the signature of the payload
@@ -85,17 +87,45 @@ func NewJWS(input string, payload interface{}) (*JWS, error) {
 // signing method.
 func (jws *JWS) ValidateSignature(key []byte) (bool, error) {
 	var validator Validator
+	var err error
 
-	switch jws.Header.Algorithm {
-	case hs256:
-		// TODO: Add hs256 validator
-	case none:
-		validator = NoneValidator{}
-	default:
-		return false, nil
+	if validator, err = getValidator(jws.Header.Algorithm); err != nil {
+		return false, err
 	}
 
 	return validator.Validate(jws, key)
+}
+
+func (jws *JWS) Sign(key []byte) error {
+	var validator Validator
+	var err error
+
+	if validator, err = getValidator(jws.Header.Algorithm); err != nil {
+		return err
+	}
+
+	validator.Sign(jws, key)
+
+	return nil
+}
+
+func (jws *JWS) Token() string {
+	header := string(jws.Header.raw)
+	payload := string(jws.Payload.raw)
+	signature := string(jws.Signature)
+
+	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
+}
+
+func getValidator(alg algorithm) (Validator, error) {
+	switch alg {
+	case HS256:
+		return HS256Validator{}, nil
+	case None:
+		return NoneValidator{}, nil
+	default:
+		return nil, ErrAlgorithmNotImplemented
+	}
 }
 
 func parseField(b64Value string) ([]byte, error) {

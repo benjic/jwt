@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"time"
 )
@@ -34,19 +35,24 @@ type Header interface{}
 
 // A Payload in a JWT represents a set of claims for a given token.
 type Payload struct {
-	Issuer         string    `json:"iss"`
-	Subject        string    `json:"sub"`
-	Audience       string    `json:"aud"`
-	ExpirationTime time.Time `json:"exp"`
-	NotBefore      time.Time `json:"nbf"`
-	IssuedAt       time.Time `json:"iat"`
-	JWTId          string    `json:"jti"`
+	Issuer         string     `json:"iss,omitempty"`
+	Subject        string     `json:"sub,omitempty"`
+	Audience       string     `json:"aud,omitempty"`
+	ExpirationTime *time.Time `json:"exp,omitempty"`
+	NotBefore      *time.Time `json:"nbf,omitempty"`
+	IssuedAt       *time.Time `json:"iat,omitempty"`
+	JWTId          string     `json:"jti,omitempty"`
 	raw            []byte
 }
 
 // JWSDecoder is a JSON Web Signature
 type JWSDecoder struct {
 	reader io.Reader
+	key    []byte
+}
+
+type JWSEncoder struct {
+	writer io.Writer
 	key    []byte
 }
 
@@ -92,6 +98,29 @@ func (dec *JWSDecoder) Decode(v interface{}) error {
 	if valid, err := jwt.ValidateSignature(dec.key); !valid || err != nil {
 		return ErrBadSignature
 	}
+
+	return nil
+}
+
+func NewJWSEncoder(w io.Writer, key []byte) *JWSEncoder {
+	return &JWSEncoder{writer: w, key: key}
+}
+
+func (enc *JWSEncoder) Encode(v interface{}, alg algorithm) error {
+
+	jws := JWS{
+		Header: &JWSHeader{
+			Algorithm:   alg,
+			ContentType: "JWT",
+		},
+		Payload: v.(*Payload),
+	}
+
+	if err := jws.Sign(enc.key); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(enc.writer, "%s", jws.Token())
 
 	return nil
 }

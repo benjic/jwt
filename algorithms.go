@@ -24,9 +24,8 @@ import (
 )
 
 const (
-	// TODO: Implement more algorithms
-	hs256 = "hs256"
-	none  = "none"
+	HS256 = "HS256"
+	None  = "none"
 )
 
 type algorithm string
@@ -34,27 +33,28 @@ type algorithm string
 // A Validator is a interface for a given signing algorithm
 type Validator interface {
 	Validate(jws *JWS, key []byte) (bool, error)
-	Sign(jws *JWS, key []byte) ([]byte, error)
+	Sign(jws *JWS, key []byte) error
 }
 
 type NoneValidator struct{}
-type hs256Validator struct{}
+type HS256Validator struct{}
 
 func (v NoneValidator) Validate(jws *JWS, key []byte) (bool, error) {
 	// NOOP Validation :-1:
 	return true, nil
 }
 
-func (v NoneValidator) Sign(jws *JWS, key []byte) ([]byte, error) {
+func (v NoneValidator) Sign(jws *JWS, key []byte) error {
 
-	jws.Header.Algorithm = none
+	jws.Header.Algorithm = None
+	jws.Signature = []byte("")
 
 	// NOOP Signing :-1:
-	return []byte(""), nil
+	return nil
 }
 
-func (v hs256Validator) Validate(jws *JWS, key []byte) (bool, error) {
-	signature, _ := base64.StdEncoding.DecodeString(addBase64Padding(string(jws.Signature)))
+func (v HS256Validator) Validate(jws *JWS, key []byte) (bool, error) {
+	signature, _ := base64.URLEncoding.DecodeString(addBase64Padding(string(jws.Signature)))
 
 	magicString := string(jws.Header.raw) + "." + string(jws.Payload.raw)
 	mac := hmac.New(sha256.New, key)
@@ -63,26 +63,36 @@ func (v hs256Validator) Validate(jws *JWS, key []byte) (bool, error) {
 	return hmac.Equal(signature, mac.Sum(nil)), nil
 }
 
-func (v hs256Validator) Sign(jws *JWS, key []byte) ([]byte, error) {
+func (v HS256Validator) Sign(jws *JWS, key []byte) error {
 
-	jws.Header.Algorithm = hs256
+	jws.Header.Algorithm = HS256
 
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
 
 	if err := json.NewEncoder(headerBuf).Encode(jws.Header); err != nil {
-		return []byte(nil), err
+		return err
 	}
 
 	if err := json.NewEncoder(payloadBuf).Encode(jws.Payload); err != nil {
-		return []byte(nil), err
+		return err
 	}
 
-	b64Header := strings.Trim(base64.URLEncoding.EncodeToString(headerBuf.Bytes()), "=")
-	b64Payload := strings.Trim(base64.URLEncoding.EncodeToString(payloadBuf.Bytes()), "=")
+	compactHeaderBuf := bytes.NewBuffer(nil)
+	compactPayloadBuf := bytes.NewBuffer(nil)
+
+	json.Compact(compactHeaderBuf, headerBuf.Bytes())
+	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
+
+	jws.Header.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
+	jws.Payload.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
+
+	base64.URLEncoding.Encode(jws.Header.raw, compactHeaderBuf.Bytes())
+	base64.URLEncoding.Encode(jws.Payload.raw, compactPayloadBuf.Bytes())
 
 	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(b64Header + "." + b64Payload))
+	mac.Write([]byte(strings.Trim(string(jws.Header.raw), "=") + "." + strings.Trim(string(jws.Payload.raw), "=")))
 
-	return mac.Sum(nil), nil
+	jws.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
+	return nil
 }
