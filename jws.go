@@ -15,19 +15,25 @@
 package jwt
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
-var (
-	// ErrBadSignature represents errors where a signature is invalid
-	ErrBadSignature            = errors.New("Invalid Signature")
-	ErrAlgorithmNotImplemented = errors.New("Requested algorithm is not implemented")
-)
+// JWSDecoder is a JSON Web Signature
+type JWSDecoder struct {
+	reader io.Reader
+	key    []byte
+}
+
+type JWSEncoder struct {
+	writer io.Writer
+	key    []byte
+}
 
 // A JWSHeader contains data related to the signature of the payload
 type JWSHeader struct {
@@ -41,6 +47,59 @@ type JWS struct {
 	Header    *JWSHeader
 	Payload   *Payload
 	Signature []byte
+}
+
+// NewJWSDecoder creates a mechanism for verifying a given jws
+func NewJWSDecoder(r io.Reader, key []byte) *JWSDecoder {
+	JWSDecoder := &JWSDecoder{reader: r, key: key}
+	return JWSDecoder
+}
+
+// Decode processes the next JWT from the input and stores it in the value pointed
+// to by v.
+func (dec *JWSDecoder) Decode(v interface{}) error {
+
+	buf := bufio.NewReader(dec.reader)
+	input, err := buf.ReadString(byte(' '))
+
+	if err != nil && err != io.EOF {
+		return ErrMalformedToken
+	}
+
+	jwt, err := NewJWS(input, v)
+
+	if err != nil {
+		return err
+	}
+
+	if valid, err := jwt.ValidateSignature(dec.key); !valid || err != nil {
+		return ErrBadSignature
+	}
+
+	return nil
+}
+
+func NewJWSEncoder(w io.Writer, key []byte) *JWSEncoder {
+	return &JWSEncoder{writer: w, key: key}
+}
+
+func (enc *JWSEncoder) Encode(v interface{}, alg algorithm) error {
+
+	jws := JWS{
+		Header: &JWSHeader{
+			Algorithm:   alg,
+			ContentType: "JWT",
+		},
+		Payload: v.(*Payload),
+	}
+
+	if err := jws.Sign(enc.key); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(enc.writer, "%s", jws.Token())
+
+	return nil
 }
 
 func NewJWSHeader(raw string) (*JWSHeader, error) {
