@@ -15,6 +15,7 @@ package jwt
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -79,4 +80,25 @@ func TestEncoder(t *testing.T) {
 	if buf.String() != generatedJWTToken {
 		t.Errorf("Invalid Token:\n%s\n%s", buf.String(), generatedJWTToken)
 	}
+}
+
+func ExampleEncoder() {
+	payload := &struct {
+		Payload
+		Admin  bool `json:"admin"`
+		UserID int  `json:"user_id"`
+	}{
+		Payload: Payload{Issuer: "Ben Campbell"},
+		Admin:   true,
+		UserID:  1234,
+	}
+	tokenBuffer := bytes.NewBuffer(nil)
+	err := NewEncoder(tokenBuffer, []byte("bogokey")).Encode(payload, HS256)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(tokenBuffer.String())
+	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0=.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI=
 }

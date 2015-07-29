@@ -81,13 +81,13 @@ func TestHS256validate(t *testing.T) {
 		Header: &Header{
 			Algorithm:   HS256,
 			ContentType: "JWT",
-			raw:         []byte(b64Header),
 		},
+		headerRaw: []byte(b64Header),
 		Payload: &Payload{
 			Subject: "1234567890",
-			raw:     []byte(b64Payload),
 		},
-		Signature: []byte(b64Signature),
+		payloadRaw: []byte(b64Payload),
+		Signature:  []byte(b64Signature),
 	}
 
 	valid, err := HS256V.validate(JWT, []byte("bogokey"))

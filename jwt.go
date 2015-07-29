@@ -47,22 +47,6 @@ type Payload struct {
 	raw            []byte
 }
 
-func parsePayload(raw string, v interface{}) (*Payload, error) {
-	var err error
-	var value []byte
-	payload := &Payload{raw: []byte(raw)}
-
-	if value, err = parseField(raw); err != nil {
-		return payload, err
-	}
-
-	if err := json.NewDecoder(bytes.NewReader(value)).Decode(v); err != nil {
-		return payload, err
-	}
-
-	return payload, nil
-}
-
 // Decoder is a JSON Web Signature
 type Decoder struct {
 	reader io.Reader
@@ -83,9 +67,13 @@ type Header struct {
 
 // A JWT represents a JWT with a web signature
 type JWT struct {
-	Header    *Header
-	Payload   *Payload
-	Signature []byte
+	Header            *Header
+	headerRaw         []byte
+	Payload           interface{}
+	claimsPayload     *Payload
+	payloadRaw        []byte
+	registeredPayload Payload
+	Signature         []byte
 }
 
 // NewDecoder creates a mechanism for verifying a given JWT
@@ -129,55 +117,59 @@ func (enc *Encoder) Encode(v interface{}, alg Algorithm) error {
 			Algorithm:   alg,
 			ContentType: "JWT",
 		},
-		Payload: v.(*Payload),
+		Payload: v,
 	}
 
 	if err := JWT.sign(enc.key); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(enc.writer, "%s", JWT.Token())
+	fmt.Fprintf(enc.writer, "%s", JWT.token())
 
 	return nil
 }
 
-func parseHeader(raw string) (*Header, error) {
+func (jwt *JWT) parseHeader(raw string) error {
 	var err error
 	var value []byte
-	header := &Header{raw: []byte(raw)}
 
 	if value, err = parseField(raw); err != nil {
-		return header, err
+		return err
 	}
 
-	if err = json.NewDecoder(bytes.NewReader(value)).Decode(header); err != nil {
-		return header, err
+	jwt.headerRaw = []byte(raw)
+
+	if err = json.NewDecoder(bytes.NewReader(value)).Decode(jwt.Header); err != nil {
+		return err
 	}
 
-	return header, err
+	return err
 }
 
 func parseJWT(input string, payload interface{}) (*JWT, error) {
 	var err error
-	JWT := &JWT{}
+	jwt := &JWT{
+		Header:        &Header{},
+		claimsPayload: &Payload{},
+	}
 
 	fields := strings.Split(input, ".")
 
 	if len(fields) != 3 {
-		return JWT, ErrMalformedToken
+		return jwt, ErrMalformedToken
 	}
 
-	if JWT.Header, err = parseHeader(fields[0]); err != nil {
-		return JWT, err
+	if err = jwt.parseHeader(fields[0]); err != nil {
+		return jwt, err
 	}
 
-	if JWT.Payload, err = parsePayload(fields[1], payload); err != nil {
-		return JWT, err
+	if err = jwt.parsePayload(fields[1], payload); err != nil {
+		return jwt, err
 	}
 
-	JWT.Signature = []byte(fields[2])
+	jwt.Signature = []byte(fields[2])
 
-	return JWT, nil
+	return jwt, nil
 }
 
 // validateSignature uses the header of a given JWT to determine a the signing algorithm
@@ -207,9 +199,9 @@ func (JWT *JWT) sign(key []byte) error {
 	return nil
 }
 
-func (JWT *JWT) Token() string {
-	header := string(JWT.Header.raw)
-	payload := string(JWT.Payload.raw)
+func (JWT *JWT) token() string {
+	header := string(JWT.headerRaw)
+	payload := string(JWT.payloadRaw)
 	signature := string(JWT.Signature)
 
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
@@ -224,6 +216,26 @@ func getvalidator(alg Algorithm) (validator, error) {
 	default:
 		return nil, ErrAlgorithmNotImplemented
 	}
+}
+
+func (jwt *JWT) parsePayload(raw string, v interface{}) error {
+	var err error
+	var value []byte
+	jwt.payloadRaw = []byte(raw)
+
+	if value, err = parseField(raw); err != nil {
+		return err
+	}
+
+	if err := json.NewDecoder(bytes.NewReader(value)).Decode(v); err != nil {
+		return err
+	}
+
+	if err := json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload); err != nil {
+		return err
+	}
+
+	return err
 }
 
 func parseField(b64Value string) ([]byte, error) {

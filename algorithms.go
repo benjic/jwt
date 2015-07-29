@@ -62,7 +62,7 @@ func (v nonevalidator) sign(JWT *JWT, key []byte) error {
 func (v hs256validator) validate(JWT *JWT, key []byte) (bool, error) {
 	signature, _ := base64.URLEncoding.DecodeString(addBase64Padding(string(JWT.Signature)))
 
-	magicString := string(JWT.Header.raw) + "." + string(JWT.Payload.raw)
+	magicString := string(JWT.headerRaw) + "." + string(JWT.payloadRaw)
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(magicString))
 
@@ -90,14 +90,14 @@ func (v hs256validator) sign(JWT *JWT, key []byte) error {
 	json.Compact(compactHeaderBuf, headerBuf.Bytes())
 	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
 
-	JWT.Header.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
-	JWT.Payload.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
+	JWT.headerRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
+	JWT.payloadRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
 
-	base64.URLEncoding.Encode(JWT.Header.raw, compactHeaderBuf.Bytes())
-	base64.URLEncoding.Encode(JWT.Payload.raw, compactPayloadBuf.Bytes())
+	base64.URLEncoding.Encode(JWT.headerRaw, compactHeaderBuf.Bytes())
+	base64.URLEncoding.Encode(JWT.payloadRaw, compactPayloadBuf.Bytes())
 
 	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(strings.Trim(string(JWT.Header.raw), "=") + "." + strings.Trim(string(JWT.Payload.raw), "=")))
+	mac.Write([]byte(strings.Trim(string(JWT.headerRaw), "=") + "." + strings.Trim(string(JWT.payloadRaw), "=")))
 
 	JWT.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
 	return nil
