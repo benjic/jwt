@@ -6,7 +6,8 @@
 The best way to understand how something functions is by taking it apart and putting it back together. This is a exploration in
 implementing a simple and concise encoder/decoder library for JWT.
 
-[![Build Status](https://travis-ci.org/benjic/jwt.svg?branch=travis_ci)](https://travis-ci.org/benjic/jwt)
+[![Build Status](https://travis-ci.org/benjic/jwt.svg?branch=master)](https://travis-ci.org/benjic/jwt)
+[![GoDoc](https://godoc.org/github.com/benjic/jwt?status.svg)](https://godoc.org/github.com/benjic/jwt)
 
 #### References
 - [JWT Homepage][1]
