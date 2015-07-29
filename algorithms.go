@@ -24,57 +24,63 @@ import (
 )
 
 const (
+	// HS256 is the HMAC SHA256 signing algorithm
 	HS256 = "HS256"
-	None  = "none"
+	// None is the noop siging algorithm
+	None = "none"
 )
 
-type algorithm string
+// An Algorithm describes the signing algorithm as defined by the JWT specficiation
+type Algorithm string
 
-// A Validator is a interface for a given signing algorithm
-type Validator interface {
-	Validate(jws *JWS, key []byte) (bool, error)
-	Sign(jws *JWS, key []byte) error
+// A validator describes a pair of algorithmic operations that can be performed on
+// a give JWT.
+type validator interface {
+	// validate asserts if a given token is signed correctly
+	validate(JWT *JWT, key []byte) (bool, error)
+	// Sign adds a new signature to a given JWT
+	sign(JWT *JWT, key []byte) error
 }
 
-type NoneValidator struct{}
-type HS256Validator struct{}
+type nonevalidator struct{}
+type hs256validator struct{}
 
-func (v NoneValidator) Validate(jws *JWS, key []byte) (bool, error) {
+func (v nonevalidator) validate(JWT *JWT, key []byte) (bool, error) {
 	// NOOP Validation :-1:
 	return true, nil
 }
 
-func (v NoneValidator) Sign(jws *JWS, key []byte) error {
+func (v nonevalidator) sign(JWT *JWT, key []byte) error {
 
-	jws.Header.Algorithm = None
-	jws.Signature = []byte("")
+	JWT.Header.Algorithm = None
+	JWT.Signature = []byte("")
 
 	// NOOP Signing :-1:
 	return nil
 }
 
-func (v HS256Validator) Validate(jws *JWS, key []byte) (bool, error) {
-	signature, _ := base64.URLEncoding.DecodeString(addBase64Padding(string(jws.Signature)))
+func (v hs256validator) validate(JWT *JWT, key []byte) (bool, error) {
+	signature, _ := base64.URLEncoding.DecodeString(addBase64Padding(string(JWT.Signature)))
 
-	magicString := string(jws.Header.raw) + "." + string(jws.Payload.raw)
+	magicString := string(JWT.Header.raw) + "." + string(JWT.Payload.raw)
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(magicString))
 
 	return hmac.Equal(signature, mac.Sum(nil)), nil
 }
 
-func (v HS256Validator) Sign(jws *JWS, key []byte) error {
+func (v hs256validator) sign(JWT *JWT, key []byte) error {
 
-	jws.Header.Algorithm = HS256
+	JWT.Header.Algorithm = HS256
 
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
 
-	if err := json.NewEncoder(headerBuf).Encode(jws.Header); err != nil {
+	if err := json.NewEncoder(headerBuf).Encode(JWT.Header); err != nil {
 		return err
 	}
 
-	if err := json.NewEncoder(payloadBuf).Encode(jws.Payload); err != nil {
+	if err := json.NewEncoder(payloadBuf).Encode(JWT.Payload); err != nil {
 		return err
 	}
 
@@ -84,15 +90,15 @@ func (v HS256Validator) Sign(jws *JWS, key []byte) error {
 	json.Compact(compactHeaderBuf, headerBuf.Bytes())
 	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
 
-	jws.Header.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
-	jws.Payload.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
+	JWT.Header.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
+	JWT.Payload.raw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
 
-	base64.URLEncoding.Encode(jws.Header.raw, compactHeaderBuf.Bytes())
-	base64.URLEncoding.Encode(jws.Payload.raw, compactPayloadBuf.Bytes())
+	base64.URLEncoding.Encode(JWT.Header.raw, compactHeaderBuf.Bytes())
+	base64.URLEncoding.Encode(JWT.Payload.raw, compactPayloadBuf.Bytes())
 
 	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(strings.Trim(string(jws.Header.raw), "=") + "." + strings.Trim(string(jws.Payload.raw), "=")))
+	mac.Write([]byte(strings.Trim(string(JWT.Header.raw), "=") + "." + strings.Trim(string(JWT.Payload.raw), "=")))
 
-	jws.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
+	JWT.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
 	return nil
 }

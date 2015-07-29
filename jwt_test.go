@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	validJWSToken     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
-	generatedJWSToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIn0=.PJ5rUFTxZU5_qAS0yI5jdmoMHAD-lio-ZiNh2qOQqj0="
+	validJWTToken     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+	generatedJWTToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIn0=.PJ5rUFTxZU5_qAS0yI5jdmoMHAD-lio-ZiNh2qOQqj0="
 )
 
 type TestPayload struct {
@@ -34,7 +34,7 @@ type RegisteredClaimPayload struct {
 }
 
 func TestJWTToken(t *testing.T) {
-	decoder := NewJWSDecoder(bytes.NewBufferString(validJWSToken), []byte("secret"))
+	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
 	payload := new(TestPayload)
 
 	err := decoder.Decode(payload)
@@ -53,11 +53,11 @@ func TestJWTToken(t *testing.T) {
 }
 
 func TestRegisteredClaims(t *testing.T) {
-	decoder := NewJWSDecoder(bytes.NewBufferString(validJWSToken), []byte("secret"))
+	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
 	payload := new(RegisteredClaimPayload)
 
 	if err := decoder.Decode(payload); err != nil {
-		t.Errorf("Expected validJWSToken to not throw error, got: %s", err)
+		t.Errorf("Expected validJWTToken to not throw error, got: %s", err)
 	}
 
 	if payload.Subject != "1234567890" {
@@ -65,18 +65,18 @@ func TestRegisteredClaims(t *testing.T) {
 	}
 }
 
-func TestJWSEncoder(t *testing.T) {
+func TestEncoder(t *testing.T) {
 
 	payload := &Payload{Subject: "1234567890", Issuer: "Ben Campbell"}
 
 	buf := bytes.NewBuffer(nil)
-	enc := NewJWSEncoder(buf, []byte("bogokey"))
+	enc := NewEncoder(buf, []byte("bogokey"))
 
 	if err := enc.Encode(payload, HS256); err != nil {
 		t.Errorf("Got error encoding token: %s", err)
 	}
 
-	if buf.String() != generatedJWSToken {
-		t.Errorf("Invalid Token:\n%s\n%s", buf.String(), generatedJWSToken)
+	if buf.String() != generatedJWTToken {
+		t.Errorf("Invalid Token:\n%s\n%s", buf.String(), generatedJWTToken)
 	}
 }

@@ -19,12 +19,12 @@ import (
 	"testing"
 )
 
-func TestNoneValidate(t *testing.T) {
+func TestNonevalidate(t *testing.T) {
 
-	nv := NoneValidator{}
+	nv := nonevalidator{}
 
-	jws := &JWS{
-		Header: &JWSHeader{
+	JWT := &JWT{
+		Header: &Header{
 			Algorithm:   None,
 			ContentType: "JWT",
 		},
@@ -34,10 +34,10 @@ func TestNoneValidate(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	valid, err := nv.Validate(jws, []byte("bogokey"))
+	valid, err := nv.validate(JWT, []byte("bogokey"))
 
 	if err != nil {
-		t.Errorf("Didn't expect NoneValidator to return an error: %s", err)
+		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
 	}
 
 	if !valid {
@@ -45,11 +45,11 @@ func TestNoneValidate(t *testing.T) {
 	}
 }
 
-func TestNoneSign(t *testing.T) {
-	nv := NoneValidator{}
+func TestNonesign(t *testing.T) {
+	nv := nonevalidator{}
 
-	jws := &JWS{
-		Header: &JWSHeader{
+	JWT := &JWT{
+		Header: &Header{
 			Algorithm:   None,
 			ContentType: "JWT",
 		},
@@ -59,26 +59,26 @@ func TestNoneSign(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	err := nv.Sign(jws, []byte("bogokey"))
+	err := nv.sign(JWT, []byte("bogokey"))
 
 	if err != nil {
-		t.Errorf("Didn't expect NoneValidator.Sign to return an error: %s", err)
+		t.Errorf("Didn't expect nonevalidator.Sign to return an error: %s", err)
 	}
 
-	if len(jws.Signature) != 0 {
-		t.Errorf("Invalid signature from NoneValidator. Got %#v; Expected %#v", jws.Signature, []byte(""))
+	if len(JWT.Signature) != 0 {
+		t.Errorf("Invalid signature from nonevalidator. Got %#v; Expected %#v", JWT.Signature, []byte(""))
 	}
 }
 
-func TestHS256Validate(t *testing.T) {
+func TestHS256validate(t *testing.T) {
 
-	HS256V := HS256Validator{}
+	HS256V := hs256validator{}
 	b64Header := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8"
 
-	jws := &JWS{
-		Header: &JWSHeader{
+	JWT := &JWT{
+		Header: &Header{
 			Algorithm:   HS256,
 			ContentType: "JWT",
 			raw:         []byte(b64Header),
@@ -90,10 +90,10 @@ func TestHS256Validate(t *testing.T) {
 		Signature: []byte(b64Signature),
 	}
 
-	valid, err := HS256V.Validate(jws, []byte("bogokey"))
+	valid, err := HS256V.validate(JWT, []byte("bogokey"))
 
 	if err != nil {
-		t.Errorf("Didn't expect NoneValidator to return an error: %s", err)
+		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
 	}
 
 	if !valid {
@@ -101,12 +101,12 @@ func TestHS256Validate(t *testing.T) {
 	}
 }
 
-func TestHS256Sign(t *testing.T) {
-	HS256V := HS256Validator{}
+func TestHS256sign(t *testing.T) {
+	HS256V := hs256validator{}
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8="
 
-	jws := &JWS{
-		Header: &JWSHeader{
+	JWT := &JWT{
+		Header: &Header{
 			Algorithm:   HS256,
 			ContentType: "JWT",
 		},
@@ -116,23 +116,23 @@ func TestHS256Sign(t *testing.T) {
 		Signature: []byte(""),
 	}
 
-	err := HS256V.Sign(jws, []byte("bogokey"))
+	err := HS256V.sign(JWT, []byte("bogokey"))
 
 	if err != nil {
-		t.Errorf("Didn't expect HS256Validator.Sign to return an error: %s", err)
+		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
 	}
 
-	if !bytes.Equal(jws.Signature, []byte(b64Signature)) {
-		t.Errorf("Invalid signature from HS256Validator. Got %#v; Expected %#v", string(jws.Signature), b64Signature)
+	if !bytes.Equal(JWT.Signature, []byte(b64Signature)) {
+		t.Errorf("Invalid signature from hs256validator. Got %#v; Expected %#v", string(JWT.Signature), b64Signature)
 	}
 
-	err = HS256V.Sign(jws, []byte("definitely the wrong key"))
+	err = HS256V.sign(JWT, []byte("definitely the wrong key"))
 
 	if err != nil {
-		t.Errorf("Didn't expect HS256Validator.Sign to return an error: %s", err)
+		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
 	}
 
-	if bytes.Equal(jws.Signature, []byte(b64Signature)) {
-		t.Errorf("An invalid key for HS256Validator returned an unexpected value: %#v.", jws.Signature)
+	if bytes.Equal(JWT.Signature, []byte(b64Signature)) {
+		t.Errorf("An invalid key for hs256validator returned an unexpected value: %#v.", JWT.Signature)
 	}
 }
