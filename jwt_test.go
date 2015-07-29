@@ -102,3 +102,22 @@ func ExampleEncoder() {
 	fmt.Println(tokenBuffer.String())
 	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0=.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI=
 }
+
+func ExampleDecoder() {
+	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI="
+
+	payload := &struct {
+		Payload
+		Admin  bool `json:"admin"`
+		UserID int  `json:"user_id"`
+	}{}
+
+	err := NewDecoder(bytes.NewBufferString(token), []byte("bogokey")).Decode(payload)
+
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("%+v\n", payload)
+	// Output: &{Payload:{Issuer:Ben Campbell Subject: Audience: ExpirationTime:<nil> NotBefore:<nil> IssuedAt:<nil> JWTId: raw:[]} Admin:true UserID:1234}
+}
