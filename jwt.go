@@ -47,25 +47,32 @@ type Payload struct {
 	raw            []byte
 }
 
-// Decoder is a JSON Web Signature
+// A Decoder is a centeralized reader and key used to consume and verify a
+// given JWT token.
 type Decoder struct {
 	reader io.Reader
 	key    []byte
 }
 
+// An Encoder is a centeralized writer and key used to take a given payload and
+// produce a JWT token.
 type Encoder struct {
 	writer io.Writer
 	key    []byte
 }
 
-// A Header contains data related to the signature of the payload
+// A Header contains data related to the signature of the payload. This information
+// is a consequence of the signing process and is for reference only.
+// TODO: This should be private
 type Header struct {
 	Algorithm   Algorithm `json:"alg"`
 	ContentType string    `json:"typ"`
 	raw         []byte
 }
 
-// A JWT represents a JWT with a web signature
+// A JWT is a unified structure of the components of a JWT. This structure is
+//used internally to aggregate components during encoding and decoding.
+// TODO: This should be private
 type JWT struct {
 	Header            *Header
 	headerRaw         []byte
@@ -76,14 +83,17 @@ type JWT struct {
 	Signature         []byte
 }
 
-// NewDecoder creates a mechanism for verifying a given JWT
+// NewDecoder creates an underlying Decoder with a given key and input reader
 func NewDecoder(r io.Reader, key []byte) *Decoder {
 	Decoder := &Decoder{reader: r, key: key}
 	return Decoder
 }
 
-// Decode processes the next JWT from the input and stores it in the value pointed
-// to by v.
+// Decode consumes the next available token from the given reader and populates
+// a given interface with the matching values in the the token. The signature
+// of the given token is verified and will return an error if a bad signature is
+// found. In addition if the JWT is using an unimplemented algorithm an error will
+// be returned as well.
 func (dec *Decoder) Decode(v interface{}) error {
 
 	buf := bufio.NewReader(dec.reader)
@@ -106,10 +116,14 @@ func (dec *Decoder) Decode(v interface{}) error {
 	return nil
 }
 
+// NewEncoder creates an underlying Encoder with a given key and output writer
 func NewEncoder(w io.Writer, key []byte) *Encoder {
 	return &Encoder{writer: w, key: key}
 }
 
+// Encode takes a given payload and algorithm and composes a new signed JWT
+// in the underlying writer. This will return an error in the event that the
+// given payload cannot be encoded to JSON.
 func (enc *Encoder) Encode(v interface{}, alg Algorithm) error {
 
 	JWT := JWT{
@@ -175,34 +189,34 @@ func parseJWT(input string, payload interface{}) (*JWT, error) {
 // validateSignature uses the header of a given JWT to determine a the signing algorithm
 // and validates it. Can return an errAlgorithmNotImplemented if using a not yet implemented
 // signing method.
-func (JWT *JWT) validateSignature(key []byte) (bool, error) {
+func (jwt *JWT) validateSignature(key []byte) (bool, error) {
 	var validator validator
 	var err error
 
-	if validator, err = getvalidator(JWT.Header.Algorithm); err != nil {
+	if validator, err = getvalidator(jwt.Header.Algorithm); err != nil {
 		return false, err
 	}
 
-	return validator.validate(JWT, key)
+	return validator.validate(jwt, key)
 }
 
-func (JWT *JWT) sign(key []byte) error {
+func (jwt *JWT) sign(key []byte) error {
 	var validator validator
 	var err error
 
-	if validator, err = getvalidator(JWT.Header.Algorithm); err != nil {
+	if validator, err = getvalidator(jwt.Header.Algorithm); err != nil {
 		return err
 	}
 
-	validator.sign(JWT, key)
+	validator.sign(jwt, key)
 
 	return nil
 }
 
-func (JWT *JWT) token() string {
-	header := string(JWT.headerRaw)
-	payload := string(JWT.payloadRaw)
-	signature := string(JWT.Signature)
+func (jwt *JWT) token() string {
+	header := string(jwt.headerRaw)
+	payload := string(jwt.payloadRaw)
+	signature := string(jwt.Signature)
 
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
 }
