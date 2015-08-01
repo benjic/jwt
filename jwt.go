@@ -110,6 +110,11 @@ func (dec *Decoder) Decode(v interface{}) error {
 	}
 
 	if valid, err := jwt.validateSignature(dec.key); !valid || err != nil {
+
+		if err != nil {
+			return err
+		}
+
 		return ErrBadSignature
 	}
 
@@ -190,10 +195,10 @@ func parseJWT(input string, payload interface{}) (*JWT, error) {
 // and validates it. Can return an errAlgorithmNotImplemented if using a not yet implemented
 // signing method.
 func (jwt *JWT) validateSignature(key []byte) (bool, error) {
-	var validator validator
-	var err error
 
-	if validator, err = getvalidator(jwt.Header.Algorithm); err != nil {
+	validator, err := getvalidator(jwt.Header.Algorithm)
+
+	if err != nil {
 		return false, err
 	}
 
@@ -214,9 +219,9 @@ func (jwt *JWT) sign(key []byte) error {
 }
 
 func (jwt *JWT) token() string {
-	header := string(jwt.headerRaw)
-	payload := string(jwt.payloadRaw)
-	signature := string(jwt.Signature)
+	header := strings.Trim(string(jwt.headerRaw), "=")
+	payload := strings.Trim(string(jwt.payloadRaw), "=")
+	signature := strings.Trim(string(jwt.Signature), "=")
 
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
 }

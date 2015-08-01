@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	validJWTToken     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
-	generatedJWTToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIn0=.PJ5rUFTxZU5_qAS0yI5jdmoMHAD-lio-ZiNh2qOQqj0="
+	validJWTToken              = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+	badSignatureJWTToken       = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.WRONG_SIGNATURE"
+	generatedJWTToken          = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIiwiQWRtaW4iOnRydWUsIlVzZXJJRCI6MTIzNH0.zFYZZKQzJ5ExEbFCVl5gk1efdv3S9ZQlGHBVCqko9xc"
+	algoNotImplementedJWTToken = "eyJhbGciOiJteXN0ZXJBbGdvIiwidHlwIjoiSldUIn0.e30.jS_I8XLzsXSlf-guI94LsMaAI022VvaHjjMKk4olWI8"
 )
 
 type TestPayload struct {
@@ -29,12 +31,7 @@ type TestPayload struct {
 	Admin bool   `json:"admin"`
 }
 
-type RegisteredClaimPayload struct {
-	Payload
-	Name string `json:"name"`
-}
-
-func TestJWTToken(t *testing.T) {
+func TestDecoder(t *testing.T) {
 	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
 	payload := new(TestPayload)
 
@@ -53,9 +50,70 @@ func TestJWTToken(t *testing.T) {
 	}
 }
 
+func TestMalformedToken(t *testing.T) {
+	malformedTokens := []string{"adfasdf.asd", ""}
+	badBase64Tokens := []string{"not.base.64", "======.23.23"}
+
+	for _, badJWT := range malformedTokens {
+		decoder := NewDecoder(bytes.NewBufferString(badJWT), []byte("secret"))
+		payload := new(TestPayload)
+
+		err := decoder.Decode(payload)
+
+		if err != ErrMalformedToken {
+			t.Errorf("Expected %s to error as ErrMalformedToken; got %+v", badJWT, err)
+		}
+	}
+
+	for _, badJWT := range badBase64Tokens {
+		decoder := NewDecoder(bytes.NewBufferString(badJWT), []byte("secret"))
+		payload := new(TestPayload)
+
+		err := decoder.Decode(payload)
+
+		if err == nil {
+			t.Errorf("Expected %s to error as CorruptInputError; got %+v", badJWT, err)
+		}
+	}
+}
+
+func TestBadSignature(t *testing.T) {
+	decoder := NewDecoder(bytes.NewBufferString(badSignatureJWTToken), []byte("secret"))
+	payload := new(TestPayload)
+
+	err := decoder.Decode(payload)
+
+	if err != ErrBadSignature {
+		t.Errorf("Expected decoder to error when given a bad signature")
+	}
+}
+
+func TestDecodeAlgorithmNotImplemented(t *testing.T) {
+	decoder := NewDecoder(bytes.NewBufferString(algoNotImplementedJWTToken), []byte("secret"))
+	payload := new(TestPayload)
+
+	err := decoder.Decode(payload)
+
+	if err != ErrAlgorithmNotImplemented {
+		t.Errorf("Expected decoder to error when passed an header with an un implemented algorithm: got %s", err)
+	}
+}
+
+func TestEncodeAlgorithmNotImplemented(t *testing.T) {
+
+}
+
 func TestRegisteredClaims(t *testing.T) {
 	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
-	payload := new(RegisteredClaimPayload)
+
+	// Anonymous payload
+	payload := &struct {
+		Payload
+		Name string `json:"name"`
+	}{
+		Payload{Subject: "1234567890"},
+		"Taco John",
+	}
 
 	if err := decoder.Decode(payload); err != nil {
 		t.Errorf("Expected validJWTToken to not throw error, got: %s", err)
@@ -68,7 +126,15 @@ func TestRegisteredClaims(t *testing.T) {
 
 func TestEncoder(t *testing.T) {
 
-	payload := &Payload{Subject: "1234567890", Issuer: "Ben Campbell"}
+	payload := struct {
+		Payload
+		Admin  bool
+		UserID int
+	}{
+		Payload{Subject: "1234567890", Issuer: "Ben Campbell"},
+		true,
+		1234,
+	}
 
 	buf := bytes.NewBuffer(nil)
 	enc := NewEncoder(buf, []byte("bogokey"))
@@ -100,11 +166,11 @@ func ExampleEncoder() {
 	}
 
 	fmt.Println(tokenBuffer.String())
-	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0=.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI=
+	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI
 }
 
 func ExampleDecoder() {
-	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI="
+	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI"
 
 	payload := &struct {
 		Payload
