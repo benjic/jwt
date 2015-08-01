@@ -99,10 +99,6 @@ func (dec *Decoder) Decode(v interface{}) error {
 	buf := bufio.NewReader(dec.reader)
 	input, err := buf.ReadString(byte(' '))
 
-	if err != nil && err != io.EOF {
-		return ErrMalformedToken
-	}
-
 	jwt, err := parseJWT(input, v)
 
 	if err != nil {
@@ -140,6 +136,7 @@ func (enc *Encoder) Encode(v interface{}, alg Algorithm) error {
 	}
 
 	if err := JWT.sign(enc.key); err != nil {
+		//TODO: None of the signers return erros
 		return err
 	}
 
@@ -153,13 +150,14 @@ func (jwt *JWT) parseHeader(raw string) error {
 	var value []byte
 
 	if value, err = parseField(raw); err != nil {
+		fmt.Printf("Bad parsing")
 		return err
 	}
 
 	jwt.headerRaw = []byte(raw)
 
 	if err = json.NewDecoder(bytes.NewReader(value)).Decode(jwt.Header); err != nil {
-		return err
+		return ErrMalformedToken
 	}
 
 	return err
@@ -179,11 +177,11 @@ func parseJWT(input string, payload interface{}) (*JWT, error) {
 	}
 
 	if err = jwt.parseHeader(fields[0]); err != nil {
-		return jwt, err
+		return jwt, ErrMalformedToken
 	}
 
 	if err = jwt.parsePayload(fields[1], payload); err != nil {
-		return jwt, err
+		return jwt, ErrMalformedToken
 	}
 
 	jwt.Signature = []byte(fields[2])
@@ -238,32 +236,32 @@ func getvalidator(alg Algorithm) (validator, error) {
 }
 
 func (jwt *JWT) parsePayload(raw string, v interface{}) error {
-	var err error
-	var value []byte
 	jwt.payloadRaw = []byte(raw)
+	value, err := parseField(raw)
 
-	if value, err = parseField(raw); err != nil {
+	if err != nil {
 		return err
 	}
 
-	if err := json.NewDecoder(bytes.NewReader(value)).Decode(v); err != nil {
+	// TODO: How to deal with json encoder errors?
+	err = json.NewDecoder(bytes.NewReader(value)).Decode(v)
+
+	if err != nil {
 		return err
 	}
 
-	if err := json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload); err != nil {
+	err = json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload)
+	if err != nil {
+		// This will not return errors. Nessecary?
 		return err
 	}
 
-	return err
+	return nil
 }
 
 func parseField(b64Value string) ([]byte, error) {
-	return base64.URLEncoding.DecodeString(addBase64Padding(b64Value))
-}
-
-func addBase64Padding(encoded string) string {
-	if m := len(encoded) % 4; m != 0 {
-		encoded += strings.Repeat("=", 4-m)
+	if m := len(b64Value) % 4; m != 0 {
+		b64Value += strings.Repeat("=", 4-m)
 	}
-	return encoded
+	return base64.URLEncoding.DecodeString(b64Value)
 }

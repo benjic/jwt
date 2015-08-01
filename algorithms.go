@@ -60,7 +60,16 @@ func (v nonevalidator) sign(JWT *JWT, key []byte) error {
 }
 
 func (v hs256validator) validate(JWT *JWT, key []byte) (bool, error) {
-	signature, _ := base64.URLEncoding.DecodeString(addBase64Padding(string(JWT.Signature)))
+	b64Signature := string(JWT.Signature)
+	if m := len(b64Signature) % 4; m != 0 {
+		b64Signature += strings.Repeat("=", 4-m)
+	}
+
+	signature, err := base64.URLEncoding.DecodeString(b64Signature)
+
+	if err != nil {
+		return false, ErrMalformedToken
+	}
 
 	magicString := string(JWT.headerRaw) + "." + string(JWT.payloadRaw)
 	mac := hmac.New(sha256.New, key)
@@ -76,13 +85,9 @@ func (v hs256validator) sign(JWT *JWT, key []byte) error {
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
 
-	if err := json.NewEncoder(headerBuf).Encode(JWT.Header); err != nil {
-		return err
-	}
-
-	if err := json.NewEncoder(payloadBuf).Encode(JWT.Payload); err != nil {
-		return err
-	}
+	// TODO: Determine if errors here are possible/relevant
+	json.NewEncoder(headerBuf).Encode(JWT.Header)
+	json.NewEncoder(payloadBuf).Encode(JWT.Payload)
 
 	compactHeaderBuf := bytes.NewBuffer(nil)
 	compactPayloadBuf := bytes.NewBuffer(nil)

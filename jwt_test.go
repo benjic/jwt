@@ -20,10 +20,7 @@ import (
 )
 
 const (
-	validJWTToken              = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
-	badSignatureJWTToken       = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.WRONG_SIGNATURE"
-	generatedJWTToken          = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIiwiQWRtaW4iOnRydWUsIlVzZXJJRCI6MTIzNH0.zFYZZKQzJ5ExEbFCVl5gk1efdv3S9ZQlGHBVCqko9xc"
-	algoNotImplementedJWTToken = "eyJhbGciOiJteXN0ZXJBbGdvIiwidHlwIjoiSldUIn0.e30.jS_I8XLzsXSlf-guI94LsMaAI022VvaHjjMKk4olWI8"
+	generatedJWTToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIiwiQWRtaW4iOnRydWUsIlVzZXJJRCI6MTIzNH0.zFYZZKQzJ5ExEbFCVl5gk1efdv3S9ZQlGHBVCqko9xc"
 )
 
 type TestPayload struct {
@@ -31,28 +28,101 @@ type TestPayload struct {
 	Admin bool   `json:"admin"`
 }
 
-func TestDecoder(t *testing.T) {
-	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
-	payload := new(TestPayload)
-
-	err := decoder.Decode(payload)
-
-	if err != nil {
-		t.Errorf("Expected valid JWTtoken to not throw error. Got error: %s", err)
+func TestDecodeErrors(t *testing.T) {
+	cases := []struct {
+		Reason        string
+		Token         string
+		ExpectedError error
+	}{
+		{
+			"the token is a missing fields",
+			"abc.def",
+			ErrMalformedToken,
+		},
+		{
+			"header is not valid base64",
+			"notvalidbase64.e30k.YQo=",
+			ErrMalformedToken,
+		},
+		{
+			"payload is not valid base64",
+			"eyJhbGciOiJub25lIn0K.notvalidb64.YQo=",
+			ErrMalformedToken,
+		},
+		{
+			"header is not valid JSON",
+			"YQo=.e30k.YQo=",
+			ErrMalformedToken,
+		},
+		{
+			"payload is not valid JSON",
+			"eyJhbGciOiJub25lIn0K.YQo=.YQo=",
+			ErrMalformedToken,
+		},
+		{
+			"The signature is not valid b64 string",
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.badBase64",
+			ErrMalformedToken,
+		},
+		{
+			"the algorithm in header is not supported",
+			"eyJhbGciOiJ1bmtub3duIiwidHlwIjoiSldUIn0.e30k.YQo=",
+			ErrAlgorithmNotImplemented,
+		},
+		{
+			"The signature is incorrect",
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.YQo=",
+			ErrBadSignature,
+		},
 	}
 
-	if payload.Name != "John Doe" {
-		t.Errorf("Invalid name from payload: %s", payload.Name)
+	for _, c := range cases {
+		decoder := NewDecoder(bytes.NewBufferString(c.Token), []byte("secret"))
+		payload := new(TestPayload)
+
+		err := decoder.Decode(payload)
+
+		if err != c.ExpectedError {
+			t.Errorf("Expected %s error when %s; got %s", c.ExpectedError, c.Reason, err)
+
+		}
+	}
+}
+
+func TestDecodingValidators(t *testing.T) {
+	cases := []struct {
+		Reason    string
+		Token     string
+		Algorithm Algorithm
+	}{
+		{
+			"hs256 is supported",
+			"eyJhbGciOiJIUzI1NiJ9Cg==.e30k.Yqo=",
+			HS256,
+		},
+		{
+			"none is supported",
+			"eyJhbGciOiJub25lIn0K.e30k.Yqo=",
+			None,
+		},
 	}
 
-	if !payload.Admin {
-		t.Errorf("Invalid admin claim, expected %t got %t", true, payload.Admin)
+	for _, c := range cases {
+		decoder := NewDecoder(bytes.NewBufferString(c.Token), []byte("secret"))
+		payload := new(TestPayload)
+
+		err := decoder.Decode(payload)
+
+		if err == ErrAlgorithmNotImplemented {
+			t.Errorf("Confirm %s, recieved %s", c.Reason, err)
+
+		}
 	}
 }
 
 func TestMalformedToken(t *testing.T) {
 	malformedTokens := []string{"adfasdf.asd", ""}
-	badBase64Tokens := []string{"not.base.64", "======.23.23"}
+	badBase64Tokens := []string{"not.base.64", "======.23.23", "abc.badpaylod.abc"}
 
 	for _, badJWT := range malformedTokens {
 		decoder := NewDecoder(bytes.NewBufferString(badJWT), []byte("secret"))
@@ -74,53 +144,6 @@ func TestMalformedToken(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected %s to error as CorruptInputError; got %+v", badJWT, err)
 		}
-	}
-}
-
-func TestBadSignature(t *testing.T) {
-	decoder := NewDecoder(bytes.NewBufferString(badSignatureJWTToken), []byte("secret"))
-	payload := new(TestPayload)
-
-	err := decoder.Decode(payload)
-
-	if err != ErrBadSignature {
-		t.Errorf("Expected decoder to error when given a bad signature")
-	}
-}
-
-func TestDecodeAlgorithmNotImplemented(t *testing.T) {
-	decoder := NewDecoder(bytes.NewBufferString(algoNotImplementedJWTToken), []byte("secret"))
-	payload := new(TestPayload)
-
-	err := decoder.Decode(payload)
-
-	if err != ErrAlgorithmNotImplemented {
-		t.Errorf("Expected decoder to error when passed an header with an un implemented algorithm: got %s", err)
-	}
-}
-
-func TestEncodeAlgorithmNotImplemented(t *testing.T) {
-
-}
-
-func TestRegisteredClaims(t *testing.T) {
-	decoder := NewDecoder(bytes.NewBufferString(validJWTToken), []byte("secret"))
-
-	// Anonymous payload
-	payload := &struct {
-		Payload
-		Name string `json:"name"`
-	}{
-		Payload{Subject: "1234567890"},
-		"Taco John",
-	}
-
-	if err := decoder.Decode(payload); err != nil {
-		t.Errorf("Expected validJWTToken to not throw error, got: %s", err)
-	}
-
-	if payload.Subject != "1234567890" {
-		t.Errorf("Expected Registered Claim \"sub\": 1234567890, got %s", payload.Subject)
 	}
 }
 
