@@ -19,15 +19,6 @@ import (
 	"testing"
 )
 
-const (
-	generatedJWTToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIiwiQWRtaW4iOnRydWUsIlVzZXJJRCI6MTIzNH0.zFYZZKQzJ5ExEbFCVl5gk1efdv3S9ZQlGHBVCqko9xc"
-)
-
-type TestPayload struct {
-	Name  string `json:"name"`
-	Admin bool   `json:"admin"`
-}
-
 func TestDecodeErrors(t *testing.T) {
 	cases := []struct {
 		ExpectedError error
@@ -47,7 +38,7 @@ func TestDecodeErrors(t *testing.T) {
 
 	for _, c := range cases {
 		decoder := NewDecoder(bytes.NewBufferString(c.Token), []byte("secret"))
-		payload := new(TestPayload)
+		payload := &struct{}{}
 
 		err := decoder.Decode(payload)
 
@@ -89,6 +80,16 @@ func TestDecodingValidating(t *testing.T) {
 			[]byte("bogokey"),
 		},
 		{
+			HS384,
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto",
+			[]byte("bogokey"),
+		},
+		{
+			HS512,
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto",
+			[]byte("bogokey"),
+		},
+		{
 			None,
 			"eyJhbGciOiJub25lIn0K.e30k.",
 			[]byte(nil),
@@ -97,7 +98,7 @@ func TestDecodingValidating(t *testing.T) {
 
 	for _, c := range cases {
 		decoder := NewDecoder(bytes.NewBufferString(c.Token), c.Key)
-		payload := new(TestPayload)
+		payload := &struct{}{}
 
 		err := decoder.Decode(payload)
 
@@ -110,11 +111,13 @@ func TestDecodingValidating(t *testing.T) {
 func TestEncodingSigning(t *testing.T) {
 	cases := []struct {
 		Algorithm  Algorithm
-		Reason     string
 		Payload    interface{}
 		ValidToken string
 	}{
-		{HS256, "is a supported algorithm", struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
+
+		{HS256, struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
+		{HS384, struct{}{}, "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.e30.YGfeZ7CN9vKz4M2SINxTixlpUEDqsCZNx4LMJK62Lr_Eiptnikcf5XfgDd_7eVWe"},
+		{HS512, struct{}{}, "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.e30.wHUM-6oRBExIgOk9MLOQ_80WqbuOmXXNuyTy4WmM_0WBM6pXld0mru8rZbc9-E314K9UhMkDNHbg2MRjIsCR3g"},
 	}
 
 	for _, c := range cases {
@@ -122,11 +125,11 @@ func TestEncodingSigning(t *testing.T) {
 		enc := NewEncoder(buf, []byte("bogokey"))
 
 		if err := enc.Encode(c.Payload, c.Algorithm); err != nil {
-			t.Errorf("Confirm %s, recieved %s", c.Reason, err)
+			t.Errorf("Confirm %s is a supported algorithm, recieved %s", c.Algorithm, err)
 		}
 
 		if buf.String() != c.ValidToken {
-			t.Errorf("Confirm %s\nExpected: %s\nGot: %s\n", c.Reason, c.ValidToken, buf.String())
+			t.Errorf("Confirm %s correctly generates a valid token\nExpected: %s\nGot: %s\n", c.Algorithm, c.ValidToken, buf.String())
 		}
 	}
 }

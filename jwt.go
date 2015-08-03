@@ -223,17 +223,6 @@ func (jwt *JWT) token() string {
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
 }
 
-func getvalidator(alg Algorithm) (validator, error) {
-	switch alg {
-	case HS256:
-		return hs256validator{}, nil
-	case None:
-		return nonevalidator{}, nil
-	default:
-		return nil, ErrAlgorithmNotImplemented
-	}
-}
-
 func (jwt *JWT) parsePayload(raw string, v interface{}) error {
 	jwt.payloadRaw = []byte(raw)
 	value, err := parseField(raw)

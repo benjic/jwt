@@ -16,6 +16,7 @@ package jwt
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"testing"
 )
 
@@ -72,7 +73,7 @@ func TestNonesign(t *testing.T) {
 
 func TestHS256validate(t *testing.T) {
 
-	HS256V := hs256validator{}
+	HS256V := newHSValidator(sha256.New)
 	b64Header := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8"
@@ -102,7 +103,7 @@ func TestHS256validate(t *testing.T) {
 }
 
 func TestHS256sign(t *testing.T) {
-	HS256V := hs256validator{}
+	HS256V := newHSValidator(sha256.New)
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8="
 
 	JWT := &JWT{

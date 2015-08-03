@@ -15,11 +15,11 @@ implementing a simple and concise encoder/decoder library for JWT.
 |              |  Feature  |              | Algorithm |
 |--------------|-----------|--------------|-----------|
 |     :+1:     | Sign      |     :+1:     |   HS256   |
-|     :+1:     | Verify    | :red_circle: |   HS384   |
-| :red_circle: | iss check | :red_circle: |   HS512   |
+|     :+1:     | Verify    |     :+1:     |   HS384   |
+| :red_circle: | iss check |     :+1:     |   HS512   |
 | :red_circle: | sub check | :red_circle: |   RS256   |
 | :red_circle: | aud check | :red_circle: |   RS384   |
-| :red_circle: | exp check | :red_circle: |   HS512   |
+| :red_circle: | exp check | :red_circle: |   RS512   |
 | :red_circle: | nbf check | :red_circle: |   ES256   |
 | :red_circle: | iat check | :red_circle: |   ES384   |
 | :red_circle: | jti check | :red_circle: |   ES512   |
