@@ -8,6 +8,21 @@ implementing a simple and concise encoder/decoder library for JWT.
 
 [![Build Status](https://travis-ci.org/benjic/jwt.svg?branch=master)](https://travis-ci.org/benjic/jwt)
 [![GoDoc](https://godoc.org/github.com/benjic/jwt?status.svg)](https://godoc.org/github.com/benjic/jwt)
+[![Coverage Status](https://coveralls.io/repos/benjic/jwt/badge.svg?branch=master&service=github)](https://coveralls.io/github/benjic/jwt?branch=master)
+
+## Library Features
+
+|              |  Feature  |              | Algorithm |
+|--------------|-----------|--------------|-----------|
+|     :+1:     | Sign      |     :+1:     |   HS256   |
+|     :+1:     | Verify    | :red_circle: |   HS384   |
+| :red_circle: | iss check | :red_circle: |   HS512   |
+| :red_circle: | sub check | :red_circle: |   RS256   |
+| :red_circle: | aud check | :red_circle: |   RS384   |
+| :red_circle: | exp check | :red_circle: |   HS512   |
+| :red_circle: | nbf check | :red_circle: |   ES256   |
+| :red_circle: | iat check | :red_circle: |   ES384   |
+| :red_circle: | jti check | :red_circle: |   ES512   |
 
 ## Examples
 
