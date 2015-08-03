@@ -150,7 +150,6 @@ func (jwt *JWT) parseHeader(raw string) error {
 	var value []byte
 
 	if value, err = parseField(raw); err != nil {
-		fmt.Printf("Bad parsing")
 		return err
 	}
 
@@ -250,11 +249,7 @@ func (jwt *JWT) parsePayload(raw string, v interface{}) error {
 		return err
 	}
 
-	err = json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload)
-	if err != nil {
-		// This will not return errors. Nessecary?
-		return err
-	}
+	json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload)
 
 	return nil
 }

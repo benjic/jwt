@@ -30,50 +30,19 @@ type TestPayload struct {
 
 func TestDecodeErrors(t *testing.T) {
 	cases := []struct {
+		ExpectedError error
 		Reason        string
 		Token         string
-		ExpectedError error
 	}{
-		{
-			"the token is a missing fields",
-			"abc.def",
-			ErrMalformedToken,
-		},
-		{
-			"header is not valid base64",
-			"notvalidbase64.e30k.YQo=",
-			ErrMalformedToken,
-		},
-		{
-			"payload is not valid base64",
-			"eyJhbGciOiJub25lIn0K.notvalidb64.YQo=",
-			ErrMalformedToken,
-		},
-		{
-			"header is not valid JSON",
-			"YQo=.e30k.YQo=",
-			ErrMalformedToken,
-		},
-		{
-			"payload is not valid JSON",
-			"eyJhbGciOiJub25lIn0K.YQo=.YQo=",
-			ErrMalformedToken,
-		},
-		{
-			"The signature is not valid b64 string",
-			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.badBase64",
-			ErrMalformedToken,
-		},
-		{
-			"the algorithm in header is not supported",
-			"eyJhbGciOiJ1bmtub3duIiwidHlwIjoiSldUIn0.e30k.YQo=",
-			ErrAlgorithmNotImplemented,
-		},
-		{
-			"The signature is incorrect",
-			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.YQo=",
-			ErrBadSignature,
-		},
+		{ErrMalformedToken, "no fields at all!", ""},
+		{ErrMalformedToken, "the token is a missing fields", "abc.def"},
+		{ErrMalformedToken, "header is not valid base64", "======.e30k.YQo="},
+		{ErrMalformedToken, "payload is not valid base64", "eyJhbGciOiJub25lIn0K.======.YQo="},
+		{ErrMalformedToken, "The signature is not valid b64 string", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.badBase64"},
+		{ErrMalformedToken, "header is not valid JSON", "YQo=.e30k.YQo="},
+		{ErrMalformedToken, "payload is not valid JSON", "eyJhbGciOiJub25lIn0K.YQo=.YQo="},
+		{ErrAlgorithmNotImplemented, "the algorithm in header is not supported", "eyJhbGciOiJ1bmtub3duIiwidHlwIjoiSldUIn0.e30k.YQo="},
+		{ErrBadSignature, "The signature is incorrect", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.YQo="},
 	}
 
 	for _, c := range cases {
@@ -84,90 +53,81 @@ func TestDecodeErrors(t *testing.T) {
 
 		if err != c.ExpectedError {
 			t.Errorf("Expected %s error when %s; got %s", c.ExpectedError, c.Reason, err)
-
 		}
 	}
 }
 
-func TestDecodingValidators(t *testing.T) {
+func TestEncodeErrors(t *testing.T) {
 	cases := []struct {
-		Reason    string
-		Token     string
+		ExpectedError error
+		Reason        string
+		Payload       interface{}
+		Algorithm     Algorithm
+	}{
+		{ErrAlgorithmNotImplemented, "using an unsupported algorithm", struct{ IsAdmin bool }{false}, "bogoAlgorithm"},
+	}
+
+	for _, c := range cases {
+		buf := bytes.NewBuffer(nil)
+		enc := NewEncoder(buf, []byte("bogokey"))
+
+		if err := enc.Encode(c.Payload, c.Algorithm); err != c.ExpectedError {
+			t.Errorf("Expected %s error when %s; got %s", c.ExpectedError, c.Reason, err)
+		}
+	}
+}
+
+func TestDecodingValidating(t *testing.T) {
+	cases := []struct {
 		Algorithm Algorithm
+		Token     string
+		Key       []byte
 	}{
 		{
-			"hs256 is supported",
-			"eyJhbGciOiJIUzI1NiJ9Cg==.e30k.Yqo=",
 			HS256,
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto",
+			[]byte("bogokey"),
 		},
 		{
-			"none is supported",
-			"eyJhbGciOiJub25lIn0K.e30k.Yqo=",
 			None,
+			"eyJhbGciOiJub25lIn0K.e30k.",
+			[]byte(nil),
 		},
 	}
 
 	for _, c := range cases {
-		decoder := NewDecoder(bytes.NewBufferString(c.Token), []byte("secret"))
+		decoder := NewDecoder(bytes.NewBufferString(c.Token), c.Key)
 		payload := new(TestPayload)
 
 		err := decoder.Decode(payload)
 
-		if err == ErrAlgorithmNotImplemented {
-			t.Errorf("Confirm %s, recieved %s", c.Reason, err)
-
+		if err != nil {
+			t.Errorf("Confirm %s is supported and valid; recieved %s", c.Algorithm, err)
 		}
 	}
 }
 
-func TestMalformedToken(t *testing.T) {
-	malformedTokens := []string{"adfasdf.asd", ""}
-	badBase64Tokens := []string{"not.base.64", "======.23.23", "abc.badpaylod.abc"}
-
-	for _, badJWT := range malformedTokens {
-		decoder := NewDecoder(bytes.NewBufferString(badJWT), []byte("secret"))
-		payload := new(TestPayload)
-
-		err := decoder.Decode(payload)
-
-		if err != ErrMalformedToken {
-			t.Errorf("Expected %s to error as ErrMalformedToken; got %+v", badJWT, err)
-		}
-	}
-
-	for _, badJWT := range badBase64Tokens {
-		decoder := NewDecoder(bytes.NewBufferString(badJWT), []byte("secret"))
-		payload := new(TestPayload)
-
-		err := decoder.Decode(payload)
-
-		if err == nil {
-			t.Errorf("Expected %s to error as CorruptInputError; got %+v", badJWT, err)
-		}
-	}
-}
-
-func TestEncoder(t *testing.T) {
-
-	payload := struct {
-		Payload
-		Admin  bool
-		UserID int
+func TestEncodingSigning(t *testing.T) {
+	cases := []struct {
+		Algorithm  Algorithm
+		Reason     string
+		Payload    interface{}
+		ValidToken string
 	}{
-		Payload{Subject: "1234567890", Issuer: "Ben Campbell"},
-		true,
-		1234,
+		{HS256, "is a supported algorithm", struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
 	}
 
-	buf := bytes.NewBuffer(nil)
-	enc := NewEncoder(buf, []byte("bogokey"))
+	for _, c := range cases {
+		buf := bytes.NewBuffer(nil)
+		enc := NewEncoder(buf, []byte("bogokey"))
 
-	if err := enc.Encode(payload, HS256); err != nil {
-		t.Errorf("Got error encoding token: %s", err)
-	}
+		if err := enc.Encode(c.Payload, c.Algorithm); err != nil {
+			t.Errorf("Confirm %s, recieved %s", c.Reason, err)
+		}
 
-	if buf.String() != generatedJWTToken {
-		t.Errorf("Invalid Token:\n%s\n%s", buf.String(), generatedJWTToken)
+		if buf.String() != c.ValidToken {
+			t.Errorf("Confirm %s\nExpected: %s\nGot: %s\n", c.Reason, c.ValidToken, buf.String())
+		}
 	}
 }
 
