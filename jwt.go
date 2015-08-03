@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package jwt a simple library for encoding and decoding JSON Web Tokens
 package jwt
 
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
-import "encoding/json"
 
 var (
 	// ErrMalformedToken represent errors where the given JWT is improperly formed
 	ErrMalformedToken = errors.New("Malformed Content")
+	// ErrBadSignature represents errors where a signature is invalid
+	ErrBadSignature = errors.New("Invalid Signature")
+	// ErrAlgorithmNotImplemented is thrown if a given JWT is using an algorithm not implemented
+	ErrAlgorithmNotImplemented = errors.New("Requested algorithm is not implemented")
 )
-
-// Header is a preamble in a JWT
-type Header interface{}
 
 // A Payload in a JWT represents a set of claims for a given token.
 type Payload struct {
@@ -45,82 +47,216 @@ type Payload struct {
 	raw            []byte
 }
 
-// JWSDecoder is a JSON Web Signature
-type JWSDecoder struct {
+// A Decoder is a centeralized reader and key used to consume and verify a
+// given JWT token.
+type Decoder struct {
 	reader io.Reader
 	key    []byte
 }
 
-type JWSEncoder struct {
+// An Encoder is a centeralized writer and key used to take a given payload and
+// produce a JWT token.
+type Encoder struct {
 	writer io.Writer
 	key    []byte
 }
 
-func NewJWTPayload(raw string, v interface{}) (*Payload, error) {
-	var err error
-	var value []byte
-	payload := &Payload{raw: []byte(raw)}
-
-	if value, err = parseField(raw); err != nil {
-		return payload, err
-	}
-
-	if err := json.NewDecoder(bytes.NewReader(value)).Decode(v); err != nil {
-		return payload, err
-	}
-
-	return payload, nil
+// A Header contains data related to the signature of the payload. This information
+// is a consequence of the signing process and is for reference only.
+// TODO: This should be private
+type Header struct {
+	Algorithm   Algorithm `json:"alg"`
+	ContentType string    `json:"typ"`
+	raw         []byte
 }
 
-// NewJWSDecoder creates a mechanism for verifying a given jws
-func NewJWSDecoder(r io.Reader, key []byte) *JWSDecoder {
-	JWSDecoder := &JWSDecoder{reader: r, key: key}
-	return JWSDecoder
+// A JWT is a unified structure of the components of a JWT. This structure is
+//used internally to aggregate components during encoding and decoding.
+// TODO: This should be private
+type JWT struct {
+	Header            *Header
+	headerRaw         []byte
+	Payload           interface{}
+	claimsPayload     *Payload
+	payloadRaw        []byte
+	registeredPayload Payload
+	Signature         []byte
 }
 
-// Decode processes the next JWT from the input and stores it in the value pointed
-// to by v.
-func (dec *JWSDecoder) Decode(v interface{}) error {
+// NewDecoder creates an underlying Decoder with a given key and input reader
+func NewDecoder(r io.Reader, key []byte) *Decoder {
+	Decoder := &Decoder{reader: r, key: key}
+	return Decoder
+}
+
+// Decode consumes the next available token from the given reader and populates
+// a given interface with the matching values in the the token. The signature
+// of the given token is verified and will return an error if a bad signature is
+// found. In addition if the JWT is using an unimplemented algorithm an error will
+// be returned as well.
+func (dec *Decoder) Decode(v interface{}) error {
 
 	buf := bufio.NewReader(dec.reader)
 	input, err := buf.ReadString(byte(' '))
 
-	if err != nil && err != io.EOF {
-		return ErrMalformedToken
-	}
-
-	jwt, err := NewJWS(input, v)
+	jwt, err := parseJWT(input, v)
 
 	if err != nil {
 		return err
 	}
 
-	if valid, err := jwt.ValidateSignature(dec.key); !valid || err != nil {
+	if valid, err := jwt.validateSignature(dec.key); !valid || err != nil {
+
+		if err != nil {
+			return err
+		}
+
 		return ErrBadSignature
 	}
 
 	return nil
 }
 
-func NewJWSEncoder(w io.Writer, key []byte) *JWSEncoder {
-	return &JWSEncoder{writer: w, key: key}
+// NewEncoder creates an underlying Encoder with a given key and output writer
+func NewEncoder(w io.Writer, key []byte) *Encoder {
+	return &Encoder{writer: w, key: key}
 }
 
-func (enc *JWSEncoder) Encode(v interface{}, alg algorithm) error {
+// Encode takes a given payload and algorithm and composes a new signed JWT
+// in the underlying writer. This will return an error in the event that the
+// given payload cannot be encoded to JSON.
+func (enc *Encoder) Encode(v interface{}, alg Algorithm) error {
 
-	jws := JWS{
-		Header: &JWSHeader{
+	JWT := JWT{
+		Header: &Header{
 			Algorithm:   alg,
 			ContentType: "JWT",
 		},
-		Payload: v.(*Payload),
+		Payload: v,
 	}
 
-	if err := jws.Sign(enc.key); err != nil {
+	if err := JWT.sign(enc.key); err != nil {
+		//TODO: None of the signers return erros
 		return err
 	}
 
-	fmt.Fprintf(enc.writer, "%s", jws.Token())
+	fmt.Fprintf(enc.writer, "%s", JWT.token())
 
 	return nil
+}
+
+func (jwt *JWT) parseHeader(raw string) error {
+	var err error
+	var value []byte
+
+	if value, err = parseField(raw); err != nil {
+		return err
+	}
+
+	jwt.headerRaw = []byte(raw)
+
+	if err = json.NewDecoder(bytes.NewReader(value)).Decode(jwt.Header); err != nil {
+		return ErrMalformedToken
+	}
+
+	return err
+}
+
+func parseJWT(input string, payload interface{}) (*JWT, error) {
+	var err error
+	jwt := &JWT{
+		Header:        &Header{},
+		claimsPayload: &Payload{},
+	}
+
+	fields := strings.Split(input, ".")
+
+	if len(fields) != 3 {
+		return jwt, ErrMalformedToken
+	}
+
+	if err = jwt.parseHeader(fields[0]); err != nil {
+		return jwt, ErrMalformedToken
+	}
+
+	if err = jwt.parsePayload(fields[1], payload); err != nil {
+		return jwt, ErrMalformedToken
+	}
+
+	jwt.Signature = []byte(fields[2])
+
+	return jwt, nil
+}
+
+// validateSignature uses the header of a given JWT to determine a the signing algorithm
+// and validates it. Can return an errAlgorithmNotImplemented if using a not yet implemented
+// signing method.
+func (jwt *JWT) validateSignature(key []byte) (bool, error) {
+
+	validator, err := getvalidator(jwt.Header.Algorithm)
+
+	if err != nil {
+		return false, err
+	}
+
+	return validator.validate(jwt, key)
+}
+
+func (jwt *JWT) sign(key []byte) error {
+	var validator validator
+	var err error
+
+	if validator, err = getvalidator(jwt.Header.Algorithm); err != nil {
+		return err
+	}
+
+	validator.sign(jwt, key)
+
+	return nil
+}
+
+func (jwt *JWT) token() string {
+	header := strings.Trim(string(jwt.headerRaw), "=")
+	payload := strings.Trim(string(jwt.payloadRaw), "=")
+	signature := strings.Trim(string(jwt.Signature), "=")
+
+	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
+}
+
+func getvalidator(alg Algorithm) (validator, error) {
+	switch alg {
+	case HS256:
+		return hs256validator{}, nil
+	case None:
+		return nonevalidator{}, nil
+	default:
+		return nil, ErrAlgorithmNotImplemented
+	}
+}
+
+func (jwt *JWT) parsePayload(raw string, v interface{}) error {
+	jwt.payloadRaw = []byte(raw)
+	value, err := parseField(raw)
+
+	if err != nil {
+		return err
+	}
+
+	// TODO: How to deal with json encoder errors?
+	err = json.NewDecoder(bytes.NewReader(value)).Decode(v)
+
+	if err != nil {
+		return err
+	}
+
+	json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload)
+
+	return nil
+}
+
+func parseField(b64Value string) ([]byte, error) {
+	if m := len(b64Value) % 4; m != 0 {
+		b64Value += strings.Repeat("=", 4-m)
+	}
+	return base64.URLEncoding.DecodeString(b64Value)
 }
