@@ -31,7 +31,7 @@ func TestNonevalidate(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	valid, err := nv.validate(JWT, []byte("bogokey"))
+	valid, err := nv.validate(JWT)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
@@ -56,7 +56,7 @@ func TestNonesign(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	err := nv.sign(JWT, []byte("bogokey"))
+	err := nv.sign(JWT)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator.Sign to return an error: %s", err)

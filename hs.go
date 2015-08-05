@@ -17,22 +17,42 @@ package jwt
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"hash"
 	"strings"
 )
 
-type hsValidator struct{ hashFunc func() hash.Hash }
-
-func newHSValidator(hashFunc func() hash.Hash) hsValidator {
-	return hsValidator{hashFunc: hashFunc}
+type hsValidator struct {
+	algorithm Algorithm
+	hashFunc  func() hash.Hash
+	Key       []byte
 }
 
-func (v hsValidator) validate(JWT *JWT, key []byte) (bool, error) {
+func NewHSValidator(algorithm Algorithm) hsValidator {
+	var hashFunc func() hash.Hash
+	switch algorithm {
+	case HS256:
+		hashFunc = sha256.New
+	case HS384:
+		hashFunc = sha512.New384
+	case HS512:
+		hashFunc = sha512.New
+	}
+
+	return hsValidator{algorithm, hashFunc, []byte(nil)}
+}
+
+func (v hsValidator) validate(JWT *JWT) (bool, error) {
 	b64Signature := string(JWT.Signature)
 	if m := len(b64Signature) % 4; m != 0 {
 		b64Signature += strings.Repeat("=", 4-m)
+	}
+
+	if JWT.Header.Algorithm != v.algorithm {
+		return false, ErrAlgorithmNotImplemented
 	}
 
 	signature, err := base64.URLEncoding.DecodeString(b64Signature)
@@ -42,13 +62,15 @@ func (v hsValidator) validate(JWT *JWT, key []byte) (bool, error) {
 	}
 
 	magicString := string(JWT.headerRaw) + "." + string(JWT.payloadRaw)
-	mac := hmac.New(v.hashFunc, key)
+	mac := hmac.New(v.hashFunc, v.Key)
 	mac.Write([]byte(magicString))
 
 	return hmac.Equal(signature, mac.Sum(nil)), nil
 }
 
-func (v hsValidator) sign(JWT *JWT, key []byte) error {
+func (v hsValidator) sign(JWT *JWT) error {
+
+	JWT.Header.Algorithm = v.algorithm
 
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
@@ -69,7 +91,7 @@ func (v hsValidator) sign(JWT *JWT, key []byte) error {
 	base64.URLEncoding.Encode(JWT.headerRaw, compactHeaderBuf.Bytes())
 	base64.URLEncoding.Encode(JWT.payloadRaw, compactPayloadBuf.Bytes())
 
-	mac := hmac.New(v.hashFunc, key)
+	mac := hmac.New(v.hashFunc, v.Key)
 	mac.Write([]byte(strings.Trim(string(JWT.headerRaw), "=") + "." + strings.Trim(string(JWT.payloadRaw), "=")))
 
 	JWT.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))

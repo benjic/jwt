@@ -16,13 +16,14 @@ package jwt
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"testing"
 )
 
 func TestHS256validate(t *testing.T) {
 
-	HS256V := newHSValidator(sha256.New)
+	HS256V := NewHSValidator(HS256)
+	HS256V.Key = []byte("bogokey")
+
 	b64Header := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8"
@@ -40,7 +41,7 @@ func TestHS256validate(t *testing.T) {
 		Signature:  []byte(b64Signature),
 	}
 
-	valid, err := HS256V.validate(JWT, []byte("bogokey"))
+	valid, err := HS256V.validate(JWT)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
@@ -52,7 +53,9 @@ func TestHS256validate(t *testing.T) {
 }
 
 func TestHS256sign(t *testing.T) {
-	HS256V := newHSValidator(sha256.New)
+	HS256V := NewHSValidator(HS256)
+	HS256V.Key = []byte("bogokey")
+
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8="
 
 	JWT := &JWT{
@@ -66,7 +69,7 @@ func TestHS256sign(t *testing.T) {
 		Signature: []byte(""),
 	}
 
-	err := HS256V.sign(JWT, []byte("bogokey"))
+	err := HS256V.sign(JWT)
 
 	if err != nil {
 		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
@@ -76,7 +79,8 @@ func TestHS256sign(t *testing.T) {
 		t.Errorf("Invalid signature from hs256validator. Got %#v; Expected %#v", string(JWT.Signature), b64Signature)
 	}
 
-	err = HS256V.sign(JWT, []byte("definitely the wrong key"))
+	HS256V.Key = []byte("definitely the wrong key")
+	err = HS256V.sign(JWT)
 
 	if err != nil {
 		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)

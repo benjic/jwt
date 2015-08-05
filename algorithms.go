@@ -14,11 +14,6 @@
 
 package jwt
 
-import (
-	"crypto/sha256"
-	"crypto/sha512"
-)
-
 const (
 	// HS256 is the HMAC SHA256 signing algorithm
 	HS256 = "HS256"
@@ -35,36 +30,21 @@ type nonevalidator struct{}
 // An Algorithm describes the signing algorithm as defined by the JWT specficiation
 type Algorithm string
 
-// A validator describes a pair of algorithmic operations that can be performed on
+// A Validator describes a pair of algorithmic operations that can be performed on
 // a give JWT.
-type validator interface {
+type Validator interface {
 	// validate asserts if a given token is signed correctly
-	validate(JWT *JWT, key []byte) (bool, error)
+	validate(JWT *JWT) (bool, error)
 	// Sign adds a new signature to a given JWT
-	sign(JWT *JWT, key []byte) error
+	sign(JWT *JWT) error
 }
 
-func getvalidator(alg Algorithm) (validator, error) {
-	switch alg {
-	case HS256:
-		return newHSValidator(sha256.New), nil
-	case HS384:
-		return newHSValidator(sha512.New384), nil
-	case HS512:
-		return newHSValidator(sha512.New), nil
-	case None:
-		return nonevalidator{}, nil
-	default:
-		return nil, ErrAlgorithmNotImplemented
-	}
-}
-
-func (v nonevalidator) validate(JWT *JWT, key []byte) (bool, error) {
+func (v nonevalidator) validate(JWT *JWT) (bool, error) {
 	// NOOP Validation :-1:
 	return true, nil
 }
 
-func (v nonevalidator) sign(JWT *JWT, key []byte) error {
+func (v nonevalidator) sign(JWT *JWT) error {
 
 	JWT.Header.Algorithm = None
 	JWT.Signature = []byte("")
