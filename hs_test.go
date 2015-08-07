@@ -19,7 +19,7 @@ import (
 	"testing"
 )
 
-func TestHS256validate(t *testing.T) {
+func TestHSvalidate(t *testing.T) {
 
 	HS256V := NewHSValidator(HS256)
 	HS256V.Key = []byte("bogokey")
@@ -52,7 +52,7 @@ func TestHS256validate(t *testing.T) {
 	}
 }
 
-func TestHS256sign(t *testing.T) {
+func TestHSsign(t *testing.T) {
 	HS256V := NewHSValidator(HS256)
 	HS256V.Key = []byte("bogokey")
 

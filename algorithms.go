@@ -14,6 +14,12 @@
 
 package jwt
 
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+)
+
 const (
 	// HS256 is the HMAC SHA256 signing algorithm
 	HS256 = "HS256"
@@ -21,6 +27,8 @@ const (
 	HS384 = "HS384"
 	// HS512 is the HMAC SHA512 signing algorithm
 	HS512 = "HS512"
+	// RS256 is a RSA algorithm using  a SHA256 algorithm
+	RS256 = "RS256"
 	// None is the noop siging algorithm
 	None = "none"
 )
@@ -51,4 +59,25 @@ func (v nonevalidator) sign(JWT *JWT) error {
 
 	// NOOP Signing :-1:
 	return nil
+}
+
+func (jwt *JWT) rawEncode() {
+	headerBuf := bytes.NewBuffer(nil)
+	payloadBuf := bytes.NewBuffer(nil)
+
+	// TODO: Determine if errors here are possible/relevant
+	json.NewEncoder(headerBuf).Encode(jwt.Header)
+	json.NewEncoder(payloadBuf).Encode(jwt.Payload)
+
+	compactHeaderBuf := bytes.NewBuffer(nil)
+	compactPayloadBuf := bytes.NewBuffer(nil)
+
+	json.Compact(compactHeaderBuf, headerBuf.Bytes())
+	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
+
+	jwt.headerRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
+	jwt.payloadRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
+
+	base64.URLEncoding.Encode(jwt.headerRaw, compactHeaderBuf.Bytes())
+	base64.URLEncoding.Encode(jwt.payloadRaw, compactPayloadBuf.Bytes())
 }

@@ -15,12 +15,10 @@
 package jwt
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
-	"encoding/json"
 	"hash"
 	"strings"
 )
@@ -71,25 +69,7 @@ func (v hsValidator) validate(JWT *JWT) (bool, error) {
 func (v hsValidator) sign(JWT *JWT) error {
 
 	JWT.Header.Algorithm = v.algorithm
-
-	headerBuf := bytes.NewBuffer(nil)
-	payloadBuf := bytes.NewBuffer(nil)
-
-	// TODO: Determine if errors here are possible/relevant
-	json.NewEncoder(headerBuf).Encode(JWT.Header)
-	json.NewEncoder(payloadBuf).Encode(JWT.Payload)
-
-	compactHeaderBuf := bytes.NewBuffer(nil)
-	compactPayloadBuf := bytes.NewBuffer(nil)
-
-	json.Compact(compactHeaderBuf, headerBuf.Bytes())
-	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
-
-	JWT.headerRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
-	JWT.payloadRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
-
-	base64.URLEncoding.Encode(JWT.headerRaw, compactHeaderBuf.Bytes())
-	base64.URLEncoding.Encode(JWT.payloadRaw, compactPayloadBuf.Bytes())
+	JWT.rawEncode()
 
 	mac := hmac.New(v.hashFunc, v.Key)
 	mac.Write([]byte(strings.Trim(string(JWT.headerRaw), "=") + "." + strings.Trim(string(JWT.payloadRaw), "=")))

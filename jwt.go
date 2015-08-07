@@ -134,7 +134,6 @@ func (enc *Encoder) Encode(v interface{}) error {
 	}
 
 	if err := enc.validator.sign(&jwt); err != nil {
-		//TODO: None of the signers return erros
 		return err
 	}
 
