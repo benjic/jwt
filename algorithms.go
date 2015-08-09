@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 )
 
 const (
@@ -80,4 +81,7 @@ func (jwt *JWT) rawEncode() {
 
 	base64.URLEncoding.Encode(jwt.headerRaw, compactHeaderBuf.Bytes())
 	base64.URLEncoding.Encode(jwt.payloadRaw, compactPayloadBuf.Bytes())
+
+	jwt.headerRaw = []byte(strings.Trim(string(jwt.headerRaw), "="))
+	jwt.payloadRaw = []byte(strings.Trim(string(jwt.payloadRaw), "="))
 }
