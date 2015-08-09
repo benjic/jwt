@@ -29,52 +29,52 @@ implementing a simple and concise encoder/decoder library for JWT.
 ### [Create token](http://godoc.com/github.com/benjic/jwt/#Encoder)
 
 ```go
-	payload := &struct {
-		Payload
-		Admin  bool `json:"admin"`
-		UserID int  `json:"user_id"`
-	}{
-		Payload: Payload{Issuer: "Ben Campbell"},
-		Admin:   true,
-		UserID:  1234,
-	}
-	tokenBuffer := bytes.NewBuffer(nil)
+payload := &struct {
+	Payload
+	Admin  bool `json:"admin"`
+	UserID int  `json:"user_id"`
+}{
+	Payload: Payload{Issuer: "Ben Campbell"},
+	Admin:   true,
+	UserID:  1234,
+}
+tokenBuffer := bytes.NewBuffer(nil)
 
-	v := NewHSValidator(HS256)
-	v.Key = []byte("bogokey")
+v := NewHSValidator(HS256)
+v.Key = []byte("bogokey")
 
-	err := NewEncoder(tokenBuffer, v).Encode(payload)
+err := NewEncoder(tokenBuffer, v).Encode(payload)
 
-	if err != nil {
-		panic(err)
-	}
+if err != nil {
+	panic(err)
+}
 
-	fmt.Println(tokenBuffer.String())
-	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI
+fmt.Println(tokenBuffer.String())
+// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI
 }
 ```
 
 ### [Consume a token](http://godoc.com/github.com/benjic/jwt/#Decoder)
 ```go
-	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI"
+token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI"
 
-	payload := &struct {
-		Payload
-		Admin  bool `json:"admin"`
-		UserID int  `json:"user_id"`
-	}{}
+payload := &struct {
+	Payload
+	Admin  bool `json:"admin"`
+	UserID int  `json:"user_id"`
+}{}
 
-	v := NewHSValidator(HS256)
-	v.Key = []byte("bogokey")
+v := NewHSValidator(HS256)
+v.Key = []byte("bogokey")
 
-	err := NewDecoder(bytes.NewBufferString(token), v).Decode(payload)
+err := NewDecoder(bytes.NewBufferString(token), v).Decode(payload)
 
-	if err != nil {
-		panic(err)
-	}
+if err != nil {
+	panic(err)
+}
 
-	fmt.Printf("%+v\n", payload)
-	// Output: &{Payload:{Issuer:Ben Campbell Subject: Audience: ExpirationTime:<nil> NotBefore:<nil> IssuedAt:<nil> JWTId: raw:[]} Admin:true UserID:1234}
+fmt.Printf("%+v\n", payload)
+// Output: &{Payload:{Issuer:Ben Campbell Subject: Audience: ExpirationTime:<nil> NotBefore:<nil> IssuedAt:<nil> JWTId: raw:[]} Admin:true UserID:1234}
 ```
 
 #### References
