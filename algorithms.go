@@ -28,8 +28,12 @@ const (
 	HS384 = "HS384"
 	// HS512 is the HMAC SHA512 signing algorithm
 	HS512 = "HS512"
-	// RS256 is a RSA algorithm using  a SHA256 algorithm
+	// RS256 is a RSA algorithm using a SHA256 algorithm
 	RS256 = "RS256"
+	// RS384 is a RSA algorithm using a SHA384 algorithm
+	RS384 = "RS384"
+	// RS512 is a RSA algorithm using a SHA512 algorithm
+	RS512 = "RS512"
 	// None is the noop siging algorithm
 	None = "none"
 )

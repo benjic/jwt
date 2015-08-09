@@ -19,6 +19,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"hash"
 	"io"
@@ -37,14 +38,24 @@ type RSValidator struct {
 }
 
 // NewRSValidator constructs a RSValidator
-func NewRSValidator(algorithm Algorithm) RSValidator {
-	// TODO: Implement all sha algorithms
-	return RSValidator{
-		algorithm:  algorithm,
-		hashType:   crypto.SHA256,
-		hashFunc:   sha256.New,
-		randReader: rand.Reader,
+func NewRSValidator(algorithm Algorithm) (v RSValidator, err error) {
+	v = RSValidator{algorithm: algorithm, randReader: rand.Reader}
+
+	switch algorithm {
+	case RS256:
+		v.hashType = crypto.SHA256
+		v.hashFunc = sha256.New
+	case RS384:
+		v.hashType = crypto.SHA384
+		v.hashFunc = sha512.New384
+	case RS512:
+		v.hashType = crypto.SHA512
+		v.hashFunc = sha512.New
+	default:
+		err = ErrAlgorithmNotImplemented
 	}
+
+	return v, err
 }
 
 func (v RSValidator) validate(jwt *JWT) (bool, error) {

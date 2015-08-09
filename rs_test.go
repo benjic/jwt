@@ -62,7 +62,7 @@ YwIDAQAB
 -----END PUBLIC KEY-----`
 
 func TestRSValidate(t *testing.T) {
-	RS256V := NewRSValidator(RS256)
+	RS256V, _ := NewRSValidator(RS256)
 	block, _ := pem.Decode([]byte(publicKey))
 	if block == nil {
 		t.Error("Unable to parse block from pem\n")
@@ -128,10 +128,31 @@ func TestRSValidate(t *testing.T) {
 
 }
 
+func TestNewRSValidator(t *testing.T) {
+	cases := []struct {
+		Algorithm     Algorithm
+		ExpectedError error
+		Reason        string
+	}{
+		{RS256, nil, "expected to get a valid RS256 validator"},
+		{RS384, nil, "expected to get a valid RS384 validator"},
+		{RS512, nil, "expected to get a valid RS512 validator"},
+		{None, ErrAlgorithmNotImplemented, "did not expect to get a valid RS validator"},
+	}
+
+	for _, c := range cases {
+		_, err := NewRSValidator(c.Algorithm)
+
+		if err != c.ExpectedError {
+			t.Errorf("%s: got %s", c.Reason, err)
+		}
+	}
+}
+
 func TestRSSign(t *testing.T) {
 	var err error
 
-	RS256V := NewRSValidator(RS256)
+	RS256V, _ := NewRSValidator(RS256)
 	block, _ := pem.Decode([]byte(privateKey))
 	if block == nil {
 		t.Errorf("Recieved error when parisng test private key: %s\n", err)
