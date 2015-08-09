@@ -22,20 +22,26 @@ import (
 )
 
 const (
+	// ES256 is the elliptic curve signing algorithm using 256 bits
+	ES256 = "ES256"
+	// ES384 is the elliptic curve signing algorithm using 384 bits
+	ES384 = "ES384"
+	// ES512 is the elliptic curve signing algorithm using 512 bits
+	ES512 = "ES512"
 	// HS256 is the HMAC SHA256 signing algorithm
 	HS256 = "HS256"
 	// HS384 is the HMAC SHA384 signing algorithm
 	HS384 = "HS384"
 	// HS512 is the HMAC SHA512 signing algorithm
 	HS512 = "HS512"
+	// None is the noop siging algorithm
+	None = "none"
 	// RS256 is a RSA algorithm using a SHA256 algorithm
 	RS256 = "RS256"
 	// RS384 is a RSA algorithm using a SHA384 algorithm
 	RS384 = "RS384"
 	// RS512 is a RSA algorithm using a SHA512 algorithm
 	RS512 = "RS512"
-	// None is the noop siging algorithm
-	None = "none"
 )
 
 type nonevalidator struct{}
