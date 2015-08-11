@@ -14,20 +14,60 @@
 
 package jwt
 
+import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"io"
+)
+
 // An ESValidator implments the validator interface and provides a signing and Validation
 // tool for Elliptic curve signed tokens
-type ESValidator struct{}
+type ESValidator struct {
+	algorithm  Algorithm
+	hashType   crypto.Hash
+	PrivateKey *ecdsa.PrivateKey
+	PublicKey  *ecdsa.PublicKey
+	rand       io.Reader
+}
 
 // NewESValidator instantiates a new instance of a parameterized Elliptic validator
 func NewESValidator(algorithm Algorithm) (v ESValidator, err error) {
+
+	v = ESValidator{algorithm: algorithm, rand: rand.Reader}
+
 	switch algorithm {
 	case ES256:
+		v.hashType = crypto.SHA256
 		return v, err
 	default:
 		return v, ErrAlgorithmNotImplemented
 	}
 }
 
-func (v ESValidator) sign(jwt *JWT) error { return nil }
+func (v ESValidator) sign(jwt *JWT) (err error) {
+	if v.PrivateKey == nil {
+		return errors.New("Cannot sign with a nil private key")
+	}
+
+	jwt.Header.Algorithm = v.algorithm
+	jwt.rawEncode()
+
+	// TODO: This block is general. Refactor it out of RS and ES validators
+	hsh := v.hashType.New()
+	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
+	hash := hsh.Sum(nil)
+
+	r, s, err := ecdsa.Sign(v.rand, v.PrivateKey, hash)
+
+	signature := r.Bytes()
+	signature = append(signature, s.Bytes()...)
+	jwt.Signature = make([]byte, base64.URLEncoding.EncodedLen(len(signature)))
+	base64.URLEncoding.Encode(jwt.Signature, signature)
+
+	return err
+}
 
 func (v ESValidator) validate(jwt *JWT) (bool, error) { return false, nil }

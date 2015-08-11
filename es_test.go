@@ -14,10 +14,37 @@
 
 package jwt
 
-import "testing"
+import (
+	"bytes"
+	"crypto/x509"
+	"encoding/pem"
+	"testing"
+)
+
+const (
+	ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIJT6K+Tzq3F45ulf2FPKPAI5wBOukUrRmW2N4AZ6uPytoAoGCCqGSM49
+AwEHoUQDQgAE8W1MRdjuuVUWOKBMnwNKV4Hc7kQ3txFPoe6SGFQibeWJY+4RQEBr
+XFduYd9OXI0eNDJna0y6k/GIoMki66bAOA==
+-----END EC PRIVATE KEY-----`
+
+	ecdsaPublicKey = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8W1MRdjuuVUWOKBMnwNKV4Hc7kQ3
+txFPoe6SGFQibeWJY+4RQEBrXFduYd9OXI0eNDJna0y6k/GIoMki66bAOA==
+-----END PUBLIC KEY-----`
+)
 
 func TestESSign(t *testing.T) {
+	var err error
+
 	v, _ := NewESValidator(ES256)
+	block, _ := pem.Decode([]byte(ecdsaPrivateKey))
+	if block == nil || err != nil {
+		t.Errorf("Recieved error when parisng test private key: %s\n", err)
+		t.FailNow()
+	}
+
+	b64signature := "7bJGDMOLuuaLiQCJiNzJR7z6Yh8r4899Y1m6A3GdAGaY7YhMBTQX8Ahs5CHHGkrcWxKSRgrkzaTbRPFQY36BSg"
 
 	jwt := &JWT{
 		Header: &Header{
@@ -29,7 +56,21 @@ func TestESSign(t *testing.T) {
 	}
 
 	//NOOP test
-	v.sign(jwt)
+	err = v.sign(jwt)
+
+	if err == nil {
+		t.Errorf("Expected signing with nil key to return error")
+	}
+
+	v.PrivateKey, err = x509.ParseECPrivateKey(block.Bytes)
+	err = v.sign(jwt)
+	if err != nil {
+		t.Errorf("%s", err)
+	}
+
+	if !bytes.Equal(jwt.Signature, []byte(b64signature)) {
+		t.Errorf("Recieved unexpected signature:\nwant: %s\n got: %s\n", b64signature, string(jwt.Signature))
+	}
 }
 func TestNewESValidator(t *testing.T) {
 	cases := []struct {

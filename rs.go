@@ -18,10 +18,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/base64"
-	"hash"
 	"io"
 	"strings"
 )
@@ -31,7 +28,6 @@ import (
 type RSValidator struct {
 	algorithm  Algorithm
 	hashType   crypto.Hash
-	hashFunc   func() hash.Hash
 	randReader io.Reader
 	PublicKey  *rsa.PublicKey
 	PrivateKey *rsa.PrivateKey
@@ -44,13 +40,10 @@ func NewRSValidator(algorithm Algorithm) (v RSValidator, err error) {
 	switch algorithm {
 	case RS256:
 		v.hashType = crypto.SHA256
-		v.hashFunc = sha256.New
 	case RS384:
 		v.hashType = crypto.SHA384
-		v.hashFunc = sha512.New384
 	case RS512:
 		v.hashType = crypto.SHA512
-		v.hashFunc = sha512.New
 	default:
 		err = ErrAlgorithmNotImplemented
 	}
@@ -73,7 +66,7 @@ func (v RSValidator) validate(jwt *JWT) (bool, error) {
 		return false, err
 	}
 
-	hsh := v.hashFunc()
+	hsh := v.hashType.New()
 	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
 	hash := hsh.Sum(nil)
 
@@ -90,7 +83,7 @@ func (v RSValidator) sign(jwt *JWT) (err error) {
 	jwt.Header.Algorithm = v.algorithm
 	jwt.rawEncode()
 
-	hsh := v.hashFunc()
+	hsh := v.hashType.New()
 	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
 	hash := hsh.Sum(nil)
 
