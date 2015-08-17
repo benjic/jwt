@@ -16,6 +16,7 @@ package jwt
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/pem"
 	"testing"
@@ -34,18 +35,28 @@ txFPoe6SGFQibeWJY+4RQEBrXFduYd9OXI0eNDJna0y6k/GIoMki66bAOA==
 -----END PUBLIC KEY-----`
 )
 
+type nullReader struct{}
+
+func (r nullReader) Read(p []byte) (n int, err error) {
+	for i := range p {
+		p[i] = byte(0)
+	}
+	return len(p), nil
+}
+
 func TestESSign(t *testing.T) {
 	var err error
 
 	v, _ := NewESValidator(ES256)
+	v.rand = nullReader{}
+
 	block, _ := pem.Decode([]byte(ecdsaPrivateKey))
 	if block == nil || err != nil {
 		t.Errorf("Recieved error when parisng test private key: %s\n", err)
 		t.FailNow()
 	}
 
-	b64signature := "7bJGDMOLuuaLiQCJiNzJR7z6Yh8r4899Y1m6A3GdAGaY7YhMBTQX8Ahs5CHHGkrcWxKSRgrkzaTbRPFQY36BSg"
-
+	b64signature := "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY1q7OQwkG30-DAgdLFcbXyCnpXQNucJwr1oF-m0ri0ZA=="
 	jwt := &JWT{
 		Header: &Header{
 			ContentType: "JWT",
@@ -55,7 +66,6 @@ func TestESSign(t *testing.T) {
 		},
 	}
 
-	//NOOP test
 	err = v.sign(jwt)
 
 	if err == nil {
@@ -72,6 +82,7 @@ func TestESSign(t *testing.T) {
 		t.Errorf("Recieved unexpected signature:\nwant: %s\n got: %s\n", b64signature, string(jwt.Signature))
 	}
 }
+
 func TestNewESValidator(t *testing.T) {
 	cases := []struct {
 		Algorithm     Algorithm
@@ -91,17 +102,70 @@ func TestNewESValidator(t *testing.T) {
 }
 
 func TestESValidate(t *testing.T) {
-	v, _ := NewESValidator(ES256)
+	ES256V, _ := NewESValidator(ES256)
+	block, _ := pem.Decode([]byte(ecdsaPublicKey))
+	if block == nil {
+		t.Error("Unable to parse block from pem\n")
+		t.FailNow()
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 
-	jwt := &JWT{
+	if err != nil {
+		t.Errorf("Recieved error when parisng test public key: %s\n", err)
+		t.FailNow()
+	}
+
+	b64Header := "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9"
+	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+	b64Signature := "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY1q7OQwkG30-DAgdLFcbXyCnpXQNucJwr1oF-m0ri0ZA=="
+
+	JWT := &JWT{
 		Header: &Header{
+			Algorithm:   RS256,
 			ContentType: "JWT",
 		},
+		headerRaw: []byte(b64Header),
 		Payload: &Payload{
 			Subject: "1234567890",
 		},
+		payloadRaw: []byte(b64Payload),
 	}
 
-	//NOOP test
-	v.validate(jwt)
+	valid, err := ES256V.validate(JWT)
+
+	if valid || err == nil {
+		t.Error("Expected a nil public key pointer to return invalid")
+	}
+
+	ES256V.PublicKey = pubKey.(*ecdsa.PublicKey)
+	JWT.Signature = []byte("invalid base64 string")
+	valid, err = ES256V.validate(JWT)
+
+	if valid || err == nil {
+		t.Error("Expected validate to return invalid signature and error when using bad base64 signature")
+	}
+
+	JWT.Signature = []byte("YmFkIHNpZ25hdHVyZQo=")
+
+	valid, err = ES256V.validate(JWT)
+
+	if valid || err == nil {
+		if err == nil {
+			t.Errorf("Did not expect esvalidator to return an error with a properly formated signature: %s", err)
+		}
+
+		t.Errorf("Expectd to find an invalid siganture")
+	}
+
+	JWT.Signature = []byte(b64Signature)
+	valid, err = ES256V.validate(JWT)
+
+	if !valid || err != nil {
+		if err != nil {
+			t.Errorf("Did not expect esvalidator to return an error with a properly formated signature: %s", err)
+		}
+
+		t.Errorf("Expected to find valid siganture")
+	}
+
 }

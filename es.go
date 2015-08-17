@@ -20,7 +20,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"io"
+	"math/big"
 )
 
 // An ESValidator implments the validator interface and provides a signing and Validation
@@ -64,10 +66,37 @@ func (v ESValidator) sign(jwt *JWT) (err error) {
 
 	signature := r.Bytes()
 	signature = append(signature, s.Bytes()...)
+	fmt.Printf("r: %+v\ns: %+v\n", r, s)
 	jwt.Signature = make([]byte, base64.URLEncoding.EncodedLen(len(signature)))
 	base64.URLEncoding.Encode(jwt.Signature, signature)
+	fmt.Printf("%d\n", len(signature))
 
 	return err
 }
 
-func (v ESValidator) validate(jwt *JWT) (bool, error) { return false, nil }
+func (v ESValidator) validate(jwt *JWT) (bool, error) {
+	r := new(big.Int)
+	s := new(big.Int)
+
+	if jwt.Signature == nil {
+		return false, ErrBadSignature
+	}
+
+	signature := make([]byte, base64.URLEncoding.DecodedLen(len(jwt.Signature)))
+
+	base64.URLEncoding.Decode(signature, jwt.Signature)
+
+	if len(signature) != 66 {
+		return false, ErrBadSignature
+	}
+
+	r.SetBytes(signature[0:32])
+	s.SetBytes(signature[32:64])
+
+	hsh := v.hashType.New()
+	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
+	hash := hsh.Sum(nil)
+
+	fmt.Printf("r: %+v\ns: %+v\n", r, s)
+	return ecdsa.Verify(v.PublicKey, hash, r, s), nil
+}
