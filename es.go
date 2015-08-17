@@ -20,7 +20,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 )
@@ -44,6 +43,12 @@ func NewESValidator(algorithm Algorithm) (v ESValidator, err error) {
 	case ES256:
 		v.hashType = crypto.SHA256
 		return v, err
+	case ES384:
+		v.hashType = crypto.SHA384
+		return v, err
+	case ES512:
+		v.hashType = crypto.SHA512
+		return v, err
 	default:
 		return v, ErrAlgorithmNotImplemented
 	}
@@ -66,10 +71,8 @@ func (v ESValidator) sign(jwt *JWT) (err error) {
 
 	signature := r.Bytes()
 	signature = append(signature, s.Bytes()...)
-	fmt.Printf("r: %+v\ns: %+v\n", r, s)
 	jwt.Signature = make([]byte, base64.URLEncoding.EncodedLen(len(signature)))
 	base64.URLEncoding.Encode(jwt.Signature, signature)
-	fmt.Printf("%d\n", len(signature))
 
 	return err
 }
@@ -79,24 +82,22 @@ func (v ESValidator) validate(jwt *JWT) (bool, error) {
 	s := new(big.Int)
 
 	if jwt.Signature == nil {
-		return false, ErrBadSignature
+		return false, ErrMalformedToken
 	}
 
 	signature := make([]byte, base64.URLEncoding.DecodedLen(len(jwt.Signature)))
+	count, err := base64.URLEncoding.Decode(signature, jwt.Signature)
 
-	base64.URLEncoding.Decode(signature, jwt.Signature)
-
-	if len(signature) != 66 {
-		return false, ErrBadSignature
+	if err != nil {
+		return false, ErrMalformedToken
 	}
 
-	r.SetBytes(signature[0:32])
-	s.SetBytes(signature[32:64])
+	r.SetBytes(signature[0 : count/2])
+	s.SetBytes(signature[count/2 : count])
 
 	hsh := v.hashType.New()
 	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
 	hash := hsh.Sum(nil)
 
-	fmt.Printf("r: %+v\ns: %+v\n", r, s)
 	return ecdsa.Verify(v.PublicKey, hash, r, s), nil
 }

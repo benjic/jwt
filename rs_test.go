@@ -165,6 +165,8 @@ func TestRSSign(t *testing.T) {
 		t.FailNow()
 	}
 
+	RS256V.randReader = nullReader{}
+
 	b64Signature := "e-mU_hjtyUkDZfe63d-WN2YlTXJkMdaR04sbORQQGKFtLYSvVVknU8rbhlGq4eWCCFnYgK9_vJ37DpIV-OBLZ1JoWvmdh1oIHJsY9PJLhw4fK6Hq20Vfde-AkCWQT3I4r93Ymc3J-sRUGrDeKLmnbWnPeC6TQS7f8vjLHnCcvOFNK7BmJadhRDfI3Wxh988KP71v9I6lSlN_zWXPbdlFljBQzF0bpyDgidCqr2EqeJpnBBeE_0Bs7J1d34N0jyEs6P5aMsoIlI07bl_zoEJ2aYWuUNR9qbyK1K-OpAGG7X7l4qLmPP1HdQmHO9JkchShLgj8soDgnZBaFAm1Us_nwA"
 	JWT := &JWT{
 		Header: &Header{

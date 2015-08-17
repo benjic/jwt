@@ -23,13 +23,13 @@ import (
 )
 
 const (
-	ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+	ecdsa256PrivateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIJT6K+Tzq3F45ulf2FPKPAI5wBOukUrRmW2N4AZ6uPytoAoGCCqGSM49
 AwEHoUQDQgAE8W1MRdjuuVUWOKBMnwNKV4Hc7kQ3txFPoe6SGFQibeWJY+4RQEBr
 XFduYd9OXI0eNDJna0y6k/GIoMki66bAOA==
 -----END EC PRIVATE KEY-----`
 
-	ecdsaPublicKey = `-----BEGIN PUBLIC KEY-----
+	ecdsa256PublicKey = `-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8W1MRdjuuVUWOKBMnwNKV4Hc7kQ3
 txFPoe6SGFQibeWJY+4RQEBrXFduYd9OXI0eNDJna0y6k/GIoMki66bAOA==
 -----END PUBLIC KEY-----`
@@ -50,7 +50,7 @@ func TestESSign(t *testing.T) {
 	v, _ := NewESValidator(ES256)
 	v.rand = nullReader{}
 
-	block, _ := pem.Decode([]byte(ecdsaPrivateKey))
+	block, _ := pem.Decode([]byte(ecdsa256PrivateKey))
 	if block == nil || err != nil {
 		t.Errorf("Recieved error when parisng test private key: %s\n", err)
 		t.FailNow()
@@ -89,21 +89,28 @@ func TestNewESValidator(t *testing.T) {
 		ExpectedError error
 		Reason        string
 	}{
-		{None, ErrAlgorithmNotImplemented, "did not expect to get a valid RS validator"},
+		{None, ErrAlgorithmNotImplemented, "did not expect to get a valid ES validator"},
+		{ES256, nil, "did not expect to get a valid ES validator"},
+		{ES384, nil, "did not expect to get a valid ES validator"},
+		{ES512, nil, "did not expect to get a valid ES validator"},
 	}
 
 	for _, c := range cases {
-		_, err := NewESValidator(c.Algorithm)
+		v, err := NewESValidator(c.Algorithm)
 
 		if err != c.ExpectedError {
 			t.Errorf("%s: got %s", c.Reason, err)
+		}
+
+		if v.algorithm != c.Algorithm {
+			t.Errorf("Expected algorithm returned by NewESValidator to be %s, got %s", c.Algorithm, v.algorithm)
 		}
 	}
 }
 
 func TestESValidate(t *testing.T) {
 	ES256V, _ := NewESValidator(ES256)
-	block, _ := pem.Decode([]byte(ecdsaPublicKey))
+	block, _ := pem.Decode([]byte(ecdsa256PublicKey))
 	if block == nil {
 		t.Error("Unable to parse block from pem\n")
 		t.FailNow()
@@ -121,7 +128,7 @@ func TestESValidate(t *testing.T) {
 
 	JWT := &JWT{
 		Header: &Header{
-			Algorithm:   RS256,
+			Algorithm:   ES256,
 			ContentType: "JWT",
 		},
 		headerRaw: []byte(b64Header),
@@ -149,8 +156,8 @@ func TestESValidate(t *testing.T) {
 
 	valid, err = ES256V.validate(JWT)
 
-	if valid || err == nil {
-		if err == nil {
+	if valid || err != nil {
+		if err != nil {
 			t.Errorf("Did not expect esvalidator to return an error with a properly formated signature: %s", err)
 		}
 
