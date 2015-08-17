@@ -28,11 +28,11 @@ import (
 
 var (
 	// ErrMalformedToken represent errors where the given JWT is improperly formed
-	ErrMalformedToken = errors.New("Malformed Content")
+	ErrMalformedToken = errors.New("malformed Content")
 	// ErrBadSignature represents errors where a signature is invalid
-	ErrBadSignature = errors.New("Invalid Signature")
+	ErrBadSignature = errors.New("invalid Signature")
 	// ErrAlgorithmNotImplemented is thrown if a given JWT is using an algorithm not implemented
-	ErrAlgorithmNotImplemented = errors.New("Requested algorithm is not implemented")
+	ErrAlgorithmNotImplemented = errors.New("requested algorithm is not implemented")
 )
 
 // A Payload in a JWT represents a set of claims for a given token.
@@ -50,15 +50,15 @@ type Payload struct {
 // A Decoder is a centeralized reader and key used to consume and verify a
 // given JWT token.
 type Decoder struct {
-	reader io.Reader
-	key    []byte
+	reader    io.Reader
+	validator Validator
 }
 
 // An Encoder is a centeralized writer and key used to take a given payload and
 // produce a JWT token.
 type Encoder struct {
-	writer io.Writer
-	key    []byte
+	writer    io.Writer
+	validator Validator
 }
 
 // A Header contains data related to the signature of the payload. This information
@@ -84,9 +84,8 @@ type JWT struct {
 }
 
 // NewDecoder creates an underlying Decoder with a given key and input reader
-func NewDecoder(r io.Reader, key []byte) *Decoder {
-	Decoder := &Decoder{reader: r, key: key}
-	return Decoder
+func NewDecoder(r io.Reader, v Validator) *Decoder {
+	return &Decoder{reader: r, validator: v}
 }
 
 // Decode consumes the next available token from the given reader and populates
@@ -105,7 +104,7 @@ func (dec *Decoder) Decode(v interface{}) error {
 		return err
 	}
 
-	if valid, err := jwt.validateSignature(dec.key); !valid || err != nil {
+	if valid, err := dec.validator.validate(jwt); !valid || err != nil {
 
 		if err != nil {
 			return err
@@ -118,29 +117,27 @@ func (dec *Decoder) Decode(v interface{}) error {
 }
 
 // NewEncoder creates an underlying Encoder with a given key and output writer
-func NewEncoder(w io.Writer, key []byte) *Encoder {
-	return &Encoder{writer: w, key: key}
+func NewEncoder(w io.Writer, v Validator) *Encoder {
+	return &Encoder{writer: w, validator: v}
 }
 
 // Encode takes a given payload and algorithm and composes a new signed JWT
 // in the underlying writer. This will return an error in the event that the
 // given payload cannot be encoded to JSON.
-func (enc *Encoder) Encode(v interface{}, alg Algorithm) error {
+func (enc *Encoder) Encode(v interface{}) error {
 
-	JWT := JWT{
+	jwt := JWT{
 		Header: &Header{
-			Algorithm:   alg,
 			ContentType: "JWT",
 		},
 		Payload: v,
 	}
 
-	if err := JWT.sign(enc.key); err != nil {
-		//TODO: None of the signers return erros
+	if err := enc.validator.sign(&jwt); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(enc.writer, "%s", JWT.token())
+	fmt.Fprintf(enc.writer, "%s", jwt.token())
 
 	return nil
 }
@@ -188,50 +185,12 @@ func parseJWT(input string, payload interface{}) (*JWT, error) {
 	return jwt, nil
 }
 
-// validateSignature uses the header of a given JWT to determine a the signing algorithm
-// and validates it. Can return an errAlgorithmNotImplemented if using a not yet implemented
-// signing method.
-func (jwt *JWT) validateSignature(key []byte) (bool, error) {
-
-	validator, err := getvalidator(jwt.Header.Algorithm)
-
-	if err != nil {
-		return false, err
-	}
-
-	return validator.validate(jwt, key)
-}
-
-func (jwt *JWT) sign(key []byte) error {
-	var validator validator
-	var err error
-
-	if validator, err = getvalidator(jwt.Header.Algorithm); err != nil {
-		return err
-	}
-
-	validator.sign(jwt, key)
-
-	return nil
-}
-
 func (jwt *JWT) token() string {
 	header := strings.Trim(string(jwt.headerRaw), "=")
 	payload := strings.Trim(string(jwt.payloadRaw), "=")
 	signature := strings.Trim(string(jwt.Signature), "=")
 
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
-}
-
-func getvalidator(alg Algorithm) (validator, error) {
-	switch alg {
-	case HS256:
-		return hs256validator{}, nil
-	case None:
-		return nonevalidator{}, nil
-	default:
-		return nil, ErrAlgorithmNotImplemented
-	}
 }
 
 func (jwt *JWT) parsePayload(raw string, v interface{}) error {

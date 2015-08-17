@@ -15,18 +15,17 @@ package jwt
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 )
 
-const (
-	generatedJWTToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJzdWIiOiIxMjM0NTY3ODkwIiwiQWRtaW4iOnRydWUsIlVzZXJJRCI6MTIzNH0.zFYZZKQzJ5ExEbFCVl5gk1efdv3S9ZQlGHBVCqko9xc"
-)
+var ErrTestValidator = errors.New("A fake validator error")
 
-type TestPayload struct {
-	Name  string `json:"name"`
-	Admin bool   `json:"admin"`
-}
+type TestValidator struct{}
+
+func (v TestValidator) sign(jwt *JWT) error             { return ErrTestValidator }
+func (v TestValidator) validate(jwt *JWT) (bool, error) { return false, ErrTestValidator }
 
 func TestDecodeErrors(t *testing.T) {
 	cases := []struct {
@@ -45,33 +44,16 @@ func TestDecodeErrors(t *testing.T) {
 		{ErrBadSignature, "The signature is incorrect", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30k.YQo="},
 	}
 
+	v := NewHSValidator(HS256)
+	v.Key = []byte("bogokey")
+
 	for _, c := range cases {
-		decoder := NewDecoder(bytes.NewBufferString(c.Token), []byte("secret"))
-		payload := new(TestPayload)
+		decoder := NewDecoder(bytes.NewBufferString(c.Token), v)
+		payload := &struct{}{}
 
 		err := decoder.Decode(payload)
 
 		if err != c.ExpectedError {
-			t.Errorf("Expected %s error when %s; got %s", c.ExpectedError, c.Reason, err)
-		}
-	}
-}
-
-func TestEncodeErrors(t *testing.T) {
-	cases := []struct {
-		ExpectedError error
-		Reason        string
-		Payload       interface{}
-		Algorithm     Algorithm
-	}{
-		{ErrAlgorithmNotImplemented, "using an unsupported algorithm", struct{ IsAdmin bool }{false}, "bogoAlgorithm"},
-	}
-
-	for _, c := range cases {
-		buf := bytes.NewBuffer(nil)
-		enc := NewEncoder(buf, []byte("bogokey"))
-
-		if err := enc.Encode(c.Payload, c.Algorithm); err != c.ExpectedError {
 			t.Errorf("Expected %s error when %s; got %s", c.ExpectedError, c.Reason, err)
 		}
 	}
@@ -89,6 +71,16 @@ func TestDecodingValidating(t *testing.T) {
 			[]byte("bogokey"),
 		},
 		{
+			HS384,
+			"eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.e30.YGfeZ7CN9vKz4M2SINxTixlpUEDqsCZNx4LMJK62Lr_Eiptnikcf5XfgDd_7eVWe",
+			[]byte("bogokey"),
+		},
+		{
+			HS512,
+			"eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.e30.wHUM-6oRBExIgOk9MLOQ_80WqbuOmXXNuyTy4WmM_0WBM6pXld0mru8rZbc9-E314K9UhMkDNHbg2MRjIsCR3g",
+			[]byte("bogokey"),
+		},
+		{
 			None,
 			"eyJhbGciOiJub25lIn0K.e30k.",
 			[]byte(nil),
@@ -96,9 +88,19 @@ func TestDecodingValidating(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		decoder := NewDecoder(bytes.NewBufferString(c.Token), c.Key)
-		payload := new(TestPayload)
+		var decoder *Decoder
 
+		switch c.Algorithm {
+		case HS256, HS384, HS512:
+			v := NewHSValidator(c.Algorithm)
+			v.Key = c.Key
+			decoder = NewDecoder(bytes.NewBufferString(c.Token), v)
+		case None:
+			v := nonevalidator{}
+			decoder = NewDecoder(bytes.NewBufferString(c.Token), v)
+		}
+
+		payload := &struct{}{}
 		err := decoder.Decode(payload)
 
 		if err != nil {
@@ -107,26 +109,49 @@ func TestDecodingValidating(t *testing.T) {
 	}
 }
 
-func TestEncodingSigning(t *testing.T) {
+func TestEncodeErrors(t *testing.T) {
 	cases := []struct {
-		Algorithm  Algorithm
-		Reason     string
-		Payload    interface{}
-		ValidToken string
+		expectedError error
+		validator     Validator
 	}{
-		{HS256, "is a supported algorithm", struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
+		{ErrTestValidator, TestValidator{}},
 	}
 
 	for _, c := range cases {
 		buf := bytes.NewBuffer(nil)
-		enc := NewEncoder(buf, []byte("bogokey"))
+		enc := NewEncoder(buf, c.validator)
 
-		if err := enc.Encode(c.Payload, c.Algorithm); err != nil {
-			t.Errorf("Confirm %s, recieved %s", c.Reason, err)
+		if err := enc.Encode(&struct{}{}); err != c.expectedError {
+			t.Errorf("Expected %s error when encoding, recieved %s", c.expectedError, err)
+		}
+	}
+}
+
+func TestEncodingSigning(t *testing.T) {
+	cases := []struct {
+		Algorithm  Algorithm
+		Payload    interface{}
+		ValidToken string
+	}{
+		{HS256, struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
+		{HS384, struct{}{}, "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.e30.YGfeZ7CN9vKz4M2SINxTixlpUEDqsCZNx4LMJK62Lr_Eiptnikcf5XfgDd_7eVWe"},
+		{HS512, struct{}{}, "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.e30.wHUM-6oRBExIgOk9MLOQ_80WqbuOmXXNuyTy4WmM_0WBM6pXld0mru8rZbc9-E314K9UhMkDNHbg2MRjIsCR3g"},
+	}
+
+	for _, c := range cases {
+		buf := bytes.NewBuffer(nil)
+
+		v := NewHSValidator(c.Algorithm)
+		v.Key = []byte("bogokey")
+
+		enc := NewEncoder(buf, v)
+
+		if err := enc.Encode(c.Payload); err != nil {
+			t.Errorf("Confirm %s is a supported algorithm, recieved %s", c.Algorithm, err)
 		}
 
 		if buf.String() != c.ValidToken {
-			t.Errorf("Confirm %s\nExpected: %s\nGot: %s\n", c.Reason, c.ValidToken, buf.String())
+			t.Errorf("Confirm %s correctly generates a valid token\nExpected:\t%s\nGot:\t\t%s\n", c.Algorithm, c.ValidToken, buf.String())
 		}
 	}
 }
@@ -142,7 +167,11 @@ func ExampleEncoder() {
 		UserID:  1234,
 	}
 	tokenBuffer := bytes.NewBuffer(nil)
-	err := NewEncoder(tokenBuffer, []byte("bogokey")).Encode(payload, HS256)
+
+	v := NewHSValidator(HS256)
+	v.Key = []byte("bogokey")
+
+	err := NewEncoder(tokenBuffer, v).Encode(payload)
 
 	if err != nil {
 		panic(err)
@@ -161,7 +190,10 @@ func ExampleDecoder() {
 		UserID int  `json:"user_id"`
 	}{}
 
-	err := NewDecoder(bytes.NewBufferString(token), []byte("bogokey")).Decode(payload)
+	v := NewHSValidator(HS256)
+	v.Key = []byte("bogokey")
+
+	err := NewDecoder(bytes.NewBufferString(token), v).Decode(payload)
 
 	if err != nil {
 		panic(err)

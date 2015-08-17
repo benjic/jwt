@@ -15,14 +15,14 @@ implementing a simple and concise encoder/decoder library for JWT.
 |              |  Feature  |              | Algorithm |
 |--------------|-----------|--------------|-----------|
 |     :+1:     | Sign      |     :+1:     |   HS256   |
-|     :+1:     | Verify    | :red_circle: |   HS384   |
-| :red_circle: | iss check | :red_circle: |   HS512   |
-| :red_circle: | sub check | :red_circle: |   RS256   |
-| :red_circle: | aud check | :red_circle: |   RS384   |
-| :red_circle: | exp check | :red_circle: |   HS512   |
-| :red_circle: | nbf check | :red_circle: |   ES256   |
-| :red_circle: | iat check | :red_circle: |   ES384   |
-| :red_circle: | jti check | :red_circle: |   ES512   |
+|     :+1:     | Verify    |     :+1:     |   HS384   |
+| :red_circle: | iss check |     :+1:     |   HS512   |
+| :red_circle: | sub check |     :+1:     |   RS256   |
+| :red_circle: | aud check |     :+1:     |   RS384   |
+| :red_circle: | exp check |     :+1:     |   RS512   |
+| :red_circle: | nbf check |     :+1:     |   ES256   |
+| :red_circle: | iat check |     :+1:     |   ES384   |
+| :red_circle: | jti check |     :+1:     |   ES512   |
 
 ## Examples
 
@@ -30,38 +30,47 @@ implementing a simple and concise encoder/decoder library for JWT.
 
 ```go
 payload := &struct {
-    Payload
-    Admin  bool `json:"admin"`
-    UserID int  `json:"user_id"`
+	Payload
+	Admin  bool `json:"admin"`
+	UserID int  `json:"user_id"`
 }{
-    Payload: Payload{Issuer: "Ben Campbell"},
-    Admin:   true,
-    UserID:  1234,
+	Payload: Payload{Issuer: "Ben Campbell"},
+	Admin:   true,
+	UserID:  1234,
 }
 tokenBuffer := bytes.NewBuffer(nil)
-err := NewEncoder(tokenBuffer, []byte("bogokey")).Encode(payload, HS256)
+
+v := NewHSValidator(HS256)
+v.Key = []byte("bogokey")
+
+err := NewEncoder(tokenBuffer, v).Encode(payload)
 
 if err != nil {
-    panic(err)
+	panic(err)
 }
 
 fmt.Println(tokenBuffer.String())
+// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI
+}
 ```
 
 ### [Consume a token](http://godoc.com/github.com/benjic/jwt/#Decoder)
 ```go
-token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI="
+token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI"
 
 payload := &struct {
-    Payload
-    Admin  bool `json:"admin"`
-    UserID int  `json:"user_id"`
+	Payload
+	Admin  bool `json:"admin"`
+	UserID int  `json:"user_id"`
 }{}
 
-err := NewDecoder(bytes.NewBufferString(token), []byte("bogokey")).Decode(payload)
+v := NewHSValidator(HS256)
+v.Key = []byte("bogokey")
+
+err := NewDecoder(bytes.NewBufferString(token), v).Decode(payload)
 
 if err != nil {
-    panic(err)
+	panic(err)
 }
 
 fmt.Printf("%+v\n", payload)
