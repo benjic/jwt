@@ -28,8 +28,8 @@ func TestHSvalidate(t *testing.T) {
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8"
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   HS256,
 			ContentType: "JWT",
 		},
@@ -41,7 +41,7 @@ func TestHSvalidate(t *testing.T) {
 		Signature:  []byte(b64Signature),
 	}
 
-	valid, err := HS256V.validate(JWT)
+	valid, err := HS256V.validate(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
@@ -58,8 +58,8 @@ func TestHSsign(t *testing.T) {
 
 	b64Signature := "Ayw1D-27S5W4XfiP-nFRm_BxSpN-v_cqlWUiwszjAB8="
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   HS256,
 			ContentType: "JWT",
 		},
@@ -69,24 +69,24 @@ func TestHSsign(t *testing.T) {
 		Signature: []byte(""),
 	}
 
-	err := HS256V.sign(JWT)
+	err := HS256V.sign(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
 	}
 
-	if !bytes.Equal(JWT.Signature, []byte(b64Signature)) {
-		t.Errorf("Invalid signature from hs256validator. Got %#v; Expected %#v", string(JWT.Signature), b64Signature)
+	if !bytes.Equal(jwt.Signature, []byte(b64Signature)) {
+		t.Errorf("Invalid signature from hs256validator. Got %#v; Expected %#v", string(jwt.Signature), b64Signature)
 	}
 
 	HS256V.Key = []byte("definitely the wrong key")
-	err = HS256V.sign(JWT)
+	err = HS256V.sign(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
 	}
 
-	if bytes.Equal(JWT.Signature, []byte(b64Signature)) {
-		t.Errorf("An invalid key for hs256validator returned an unexpected value: %#v.", JWT.Signature)
+	if bytes.Equal(jwt.Signature, []byte(b64Signature)) {
+		t.Errorf("An invalid key for hs256validator returned an unexpected value: %#v.", jwt.Signature)
 	}
 }

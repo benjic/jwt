@@ -43,13 +43,13 @@ func NewHSValidator(algorithm Algorithm) hsValidator {
 	return hsValidator{algorithm, hashFunc, []byte(nil)}
 }
 
-func (v hsValidator) validate(JWT *JWT) (bool, error) {
-	b64Signature := string(JWT.Signature)
+func (v hsValidator) validate(jwt *jwt) (bool, error) {
+	b64Signature := string(jwt.Signature)
 	if m := len(b64Signature) % 4; m != 0 {
 		b64Signature += strings.Repeat("=", 4-m)
 	}
 
-	if JWT.Header.Algorithm != v.algorithm {
+	if jwt.Header.Algorithm != v.algorithm {
 		return false, ErrAlgorithmNotImplemented
 	}
 
@@ -59,21 +59,21 @@ func (v hsValidator) validate(JWT *JWT) (bool, error) {
 		return false, ErrMalformedToken
 	}
 
-	magicString := string(JWT.headerRaw) + "." + string(JWT.payloadRaw)
+	magicString := string(jwt.headerRaw) + "." + string(jwt.payloadRaw)
 	mac := hmac.New(v.hashFunc, v.Key)
 	mac.Write([]byte(magicString))
 
 	return hmac.Equal(signature, mac.Sum(nil)), nil
 }
 
-func (v hsValidator) sign(JWT *JWT) error {
+func (v hsValidator) sign(jwt *jwt) error {
 
-	JWT.Header.Algorithm = v.algorithm
-	JWT.rawEncode()
+	jwt.Header.Algorithm = v.algorithm
+	jwt.rawEncode()
 
 	mac := hmac.New(v.hashFunc, v.Key)
-	mac.Write([]byte(strings.Trim(string(JWT.headerRaw), "=") + "." + strings.Trim(string(JWT.payloadRaw), "=")))
+	mac.Write([]byte(strings.Trim(string(jwt.headerRaw), "=") + "." + strings.Trim(string(jwt.payloadRaw), "=")))
 
-	JWT.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
+	jwt.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
 	return nil
 }

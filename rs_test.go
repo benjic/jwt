@@ -79,8 +79,8 @@ func TestRSValidate(t *testing.T) {
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "e-mU_hjtyUkDZfe63d-WN2YlTXJkMdaR04sbORQQGKFtLYSvVVknU8rbhlGq4eWCCFnYgK9_vJ37DpIV-OBLZ1JoWvmdh1oIHJsY9PJLhw4fK6Hq20Vfde-AkCWQT3I4r93Ymc3J-sRUGrDeKLmnbWnPeC6TQS7f8vjLHnCcvOFNK7BmJadhRDfI3Wxh988KP71v9I6lSlN_zWXPbdlFljBQzF0bpyDgidCqr2EqeJpnBBeE_0Bs7J1d34N0jyEs6P5aMsoIlI07bl_zoEJ2aYWuUNR9qbyK1K-OpAGG7X7l4qLmPP1HdQmHO9JkchShLgj8soDgnZBaFAm1Us_nwA=="
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   RS256,
 			ContentType: "JWT",
 		},
@@ -91,22 +91,22 @@ func TestRSValidate(t *testing.T) {
 		payloadRaw: []byte(b64Payload),
 	}
 
-	valid, err := RS256V.validate(JWT)
+	valid, err := RS256V.validate(jwt)
 
 	if valid || err == nil {
 		t.Error("Expected a nil public key pointer to return invalid")
 	}
 
 	RS256V.PublicKey = pubKey.(*rsa.PublicKey)
-	JWT.Signature = []byte("invalid base64 string")
-	valid, err = RS256V.validate(JWT)
+	jwt.Signature = []byte("invalid base64 string")
+	valid, err = RS256V.validate(jwt)
 
 	if valid || err == nil {
 		t.Error("Expected validate to return invalid signature and error when using bad base64 signature")
 	}
 
-	JWT.Signature = []byte(b64Signature)
-	valid, err = RS256V.validate(JWT)
+	jwt.Signature = []byte(b64Signature)
+	valid, err = RS256V.validate(jwt)
 
 	if !valid || err != nil {
 		if err != nil {
@@ -115,9 +115,9 @@ func TestRSValidate(t *testing.T) {
 		t.Errorf("Expectd to find valid siganture")
 	}
 
-	JWT.Signature = []byte("YmFkIHNpZ25hdHVyZQo=")
+	jwt.Signature = []byte("YmFkIHNpZ25hdHVyZQo=")
 
-	valid, err = RS256V.validate(JWT)
+	valid, err = RS256V.validate(jwt)
 
 	if valid || err == nil {
 		if err == nil {
@@ -168,8 +168,8 @@ func TestRSSign(t *testing.T) {
 	RS256V.randReader = nullReader{}
 
 	b64Signature := "e-mU_hjtyUkDZfe63d-WN2YlTXJkMdaR04sbORQQGKFtLYSvVVknU8rbhlGq4eWCCFnYgK9_vJ37DpIV-OBLZ1JoWvmdh1oIHJsY9PJLhw4fK6Hq20Vfde-AkCWQT3I4r93Ymc3J-sRUGrDeKLmnbWnPeC6TQS7f8vjLHnCcvOFNK7BmJadhRDfI3Wxh988KP71v9I6lSlN_zWXPbdlFljBQzF0bpyDgidCqr2EqeJpnBBeE_0Bs7J1d34N0jyEs6P5aMsoIlI07bl_zoEJ2aYWuUNR9qbyK1K-OpAGG7X7l4qLmPP1HdQmHO9JkchShLgj8soDgnZBaFAm1Us_nwA"
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   RS256,
 			ContentType: "JWT",
 		},
@@ -178,14 +178,14 @@ func TestRSSign(t *testing.T) {
 		},
 	}
 
-	err = RS256V.sign(JWT)
+	err = RS256V.sign(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect rs256validator.Sign to return an error: %s", err)
 	}
 
-	if !bytes.Equal(JWT.Signature, []byte(b64Signature)) {
-		t.Errorf("Invalid signature from rs256validator. Got %#v; Expected %#v", string(JWT.Signature), b64Signature)
+	if !bytes.Equal(jwt.Signature, []byte(b64Signature)) {
+		t.Errorf("Invalid signature from rs256validator. Got %#v; Expected %#v", string(jwt.Signature), b64Signature)
 	}
 
 	badKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -194,13 +194,13 @@ func TestRSSign(t *testing.T) {
 	}
 
 	RS256V.PrivateKey = badKey
-	err = RS256V.sign(JWT)
+	err = RS256V.sign(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect hs256validator.Sign to return an error: %s", err)
 	}
 
-	if bytes.Equal(JWT.Signature, []byte(b64Signature)) {
-		t.Errorf("An invalid key for hs256validator returned an unexpected value: %#v.", JWT.Signature)
+	if bytes.Equal(jwt.Signature, []byte(b64Signature)) {
+		t.Errorf("An invalid key for hs256validator returned an unexpected value: %#v.", jwt.Signature)
 	}
 }

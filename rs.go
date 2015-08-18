@@ -51,7 +51,7 @@ func NewRSValidator(algorithm Algorithm) (v RSValidator, err error) {
 	return v, err
 }
 
-func (v RSValidator) validate(jwt *JWT) (bool, error) {
+func (v RSValidator) validate(jwt *jwt) (bool, error) {
 
 	if v.PublicKey == nil {
 		return false, ErrBadSignature
@@ -79,7 +79,7 @@ func (v RSValidator) validate(jwt *JWT) (bool, error) {
 	return true, nil
 }
 
-func (v RSValidator) sign(jwt *JWT) (err error) {
+func (v RSValidator) sign(jwt *jwt) (err error) {
 	jwt.Header.Algorithm = v.algorithm
 	jwt.rawEncode()
 

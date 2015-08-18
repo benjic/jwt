@@ -46,33 +46,33 @@ const (
 
 type nonevalidator struct{}
 
-// An Algorithm describes the signing algorithm as defined by the JWT specficiation
+// An Algorithm describes the signing algorithm as defined by the jwt specficiation
 type Algorithm string
 
 // A Validator describes a pair of algorithmic operations that can be performed on
-// a give JWT.
+// a give jwt.
 type Validator interface {
 	// validate asserts if a given token is signed correctly
-	validate(JWT *JWT) (bool, error)
-	// Sign adds a new signature to a given JWT
-	sign(JWT *JWT) error
+	validate(jwt *jwt) (bool, error)
+	// Sign adds a new signature to a given jwt
+	sign(jwt *jwt) error
 }
 
-func (v nonevalidator) validate(JWT *JWT) (bool, error) {
+func (v nonevalidator) validate(jwt *jwt) (bool, error) {
 	// NOOP Validation :-1:
 	return true, nil
 }
 
-func (v nonevalidator) sign(JWT *JWT) error {
+func (v nonevalidator) sign(jwt *jwt) error {
 
-	JWT.Header.Algorithm = None
-	JWT.Signature = []byte("")
+	jwt.Header.Algorithm = None
+	jwt.Signature = []byte("")
 
 	// NOOP Signing :-1:
 	return nil
 }
 
-func (jwt *JWT) rawEncode() {
+func (jwt *jwt) rawEncode() {
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
 

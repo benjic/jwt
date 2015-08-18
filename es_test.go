@@ -57,8 +57,8 @@ func TestESSign(t *testing.T) {
 	}
 
 	b64signature := "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY1q7OQwkG30-DAgdLFcbXyCnpXQNucJwr1oF-m0ri0ZA=="
-	jwt := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			ContentType: "JWT",
 		},
 		Payload: &Payload{
@@ -126,8 +126,8 @@ func TestESValidate(t *testing.T) {
 	b64Payload := "eyJzdWIiOiIxMjM0NTY3ODkwIn0"
 	b64Signature := "axfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpY1q7OQwkG30-DAgdLFcbXyCnpXQNucJwr1oF-m0ri0ZA=="
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   ES256,
 			ContentType: "JWT",
 		},
@@ -138,23 +138,23 @@ func TestESValidate(t *testing.T) {
 		payloadRaw: []byte(b64Payload),
 	}
 
-	valid, err := ES256V.validate(JWT)
+	valid, err := ES256V.validate(jwt)
 
 	if valid || err == nil {
 		t.Error("Expected a nil public key pointer to return invalid")
 	}
 
 	ES256V.PublicKey = pubKey.(*ecdsa.PublicKey)
-	JWT.Signature = []byte("invalid base64 string")
-	valid, err = ES256V.validate(JWT)
+	jwt.Signature = []byte("invalid base64 string")
+	valid, err = ES256V.validate(jwt)
 
 	if valid || err == nil {
 		t.Error("Expected validate to return invalid signature and error when using bad base64 signature")
 	}
 
-	JWT.Signature = []byte("YmFkIHNpZ25hdHVyZQo=")
+	jwt.Signature = []byte("YmFkIHNpZ25hdHVyZQo=")
 
-	valid, err = ES256V.validate(JWT)
+	valid, err = ES256V.validate(jwt)
 
 	if valid || err != nil {
 		if err != nil {
@@ -164,8 +164,8 @@ func TestESValidate(t *testing.T) {
 		t.Errorf("Expectd to find an invalid siganture")
 	}
 
-	JWT.Signature = []byte(b64Signature)
-	valid, err = ES256V.validate(JWT)
+	jwt.Signature = []byte(b64Signature)
+	valid, err = ES256V.validate(jwt)
 
 	if !valid || err != nil {
 		if err != nil {

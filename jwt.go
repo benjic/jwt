@@ -27,15 +27,15 @@ import (
 )
 
 var (
-	// ErrMalformedToken represent errors where the given JWT is improperly formed
+	// ErrMalformedToken represent errors where the given jwt is improperly formed
 	ErrMalformedToken = errors.New("malformed Content")
 	// ErrBadSignature represents errors where a signature is invalid
 	ErrBadSignature = errors.New("invalid Signature")
-	// ErrAlgorithmNotImplemented is thrown if a given JWT is using an algorithm not implemented
+	// ErrAlgorithmNotImplemented is thrown if a given jwt is using an algorithm not implemented
 	ErrAlgorithmNotImplemented = errors.New("requested algorithm is not implemented")
 )
 
-// A Payload in a JWT represents a set of claims for a given token.
+// A Payload in a jwt represents a set of claims for a given token.
 type Payload struct {
 	Issuer         string     `json:"iss,omitempty"`
 	Subject        string     `json:"sub,omitempty"`
@@ -48,14 +48,14 @@ type Payload struct {
 }
 
 // A Decoder is a centeralized reader and key used to consume and verify a
-// given JWT token.
+// given jwt token.
 type Decoder struct {
 	reader    io.Reader
 	validator Validator
 }
 
 // An Encoder is a centeralized writer and key used to take a given payload and
-// produce a JWT token.
+// produce a jwt token.
 type Encoder struct {
 	writer    io.Writer
 	validator Validator
@@ -63,18 +63,16 @@ type Encoder struct {
 
 // A Header contains data related to the signature of the payload. This information
 // is a consequence of the signing process and is for reference only.
-// TODO: This should be private
-type Header struct {
+type header struct {
 	Algorithm   Algorithm `json:"alg"`
 	ContentType string    `json:"typ"`
 	raw         []byte
 }
 
-// A JWT is a unified structure of the components of a JWT. This structure is
+// A jwt is a unified structure of the components of a jwt. This structure is
 //used internally to aggregate components during encoding and decoding.
-// TODO: This should be private
-type JWT struct {
-	Header            *Header
+type jwt struct {
+	Header            *header
 	headerRaw         []byte
 	Payload           interface{}
 	claimsPayload     *Payload
@@ -91,7 +89,7 @@ func NewDecoder(r io.Reader, v Validator) *Decoder {
 // Decode consumes the next available token from the given reader and populates
 // a given interface with the matching values in the the token. The signature
 // of the given token is verified and will return an error if a bad signature is
-// found. In addition if the JWT is using an unimplemented algorithm an error will
+// found. In addition if the jwt is using an unimplemented algorithm an error will
 // be returned as well.
 func (dec *Decoder) Decode(v interface{}) error {
 
@@ -121,13 +119,13 @@ func NewEncoder(w io.Writer, v Validator) *Encoder {
 	return &Encoder{writer: w, validator: v}
 }
 
-// Encode takes a given payload and algorithm and composes a new signed JWT
+// Encode takes a given payload and algorithm and composes a new signed jwt
 // in the underlying writer. This will return an error in the event that the
 // given payload cannot be encoded to JSON.
 func (enc *Encoder) Encode(v interface{}) error {
 
-	jwt := JWT{
-		Header: &Header{
+	jwt := jwt{
+		Header: &header{
 			ContentType: "JWT",
 		},
 		Payload: v,
@@ -142,7 +140,7 @@ func (enc *Encoder) Encode(v interface{}) error {
 	return nil
 }
 
-func (jwt *JWT) parseHeader(raw string) error {
+func (jwt *jwt) parseHeader(raw string) error {
 	var err error
 	var value []byte
 
@@ -159,10 +157,10 @@ func (jwt *JWT) parseHeader(raw string) error {
 	return err
 }
 
-func parseJWT(input string, payload interface{}) (*JWT, error) {
+func parseJWT(input string, payload interface{}) (*jwt, error) {
 	var err error
-	jwt := &JWT{
-		Header:        &Header{},
+	jwt := &jwt{
+		Header:        &header{},
 		claimsPayload: &Payload{},
 	}
 
@@ -185,7 +183,7 @@ func parseJWT(input string, payload interface{}) (*JWT, error) {
 	return jwt, nil
 }
 
-func (jwt *JWT) token() string {
+func (jwt *jwt) token() string {
 	header := strings.Trim(string(jwt.headerRaw), "=")
 	payload := strings.Trim(string(jwt.payloadRaw), "=")
 	signature := strings.Trim(string(jwt.Signature), "=")
@@ -193,7 +191,7 @@ func (jwt *JWT) token() string {
 	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
 }
 
-func (jwt *JWT) parsePayload(raw string, v interface{}) error {
+func (jwt *jwt) parsePayload(raw string, v interface{}) error {
 	jwt.payloadRaw = []byte(raw)
 	value, err := parseField(raw)
 

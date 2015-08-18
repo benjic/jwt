@@ -20,8 +20,8 @@ func TestNonevalidate(t *testing.T) {
 
 	nv := nonevalidator{}
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   None,
 			ContentType: "JWT",
 		},
@@ -31,7 +31,7 @@ func TestNonevalidate(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	valid, err := nv.validate(JWT)
+	valid, err := nv.validate(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator to return an error: %s", err)
@@ -45,8 +45,8 @@ func TestNonevalidate(t *testing.T) {
 func TestNonesign(t *testing.T) {
 	nv := nonevalidator{}
 
-	JWT := &JWT{
-		Header: &Header{
+	jwt := &jwt{
+		Header: &header{
 			Algorithm:   None,
 			ContentType: "JWT",
 		},
@@ -56,13 +56,13 @@ func TestNonesign(t *testing.T) {
 		Signature: []byte(nil),
 	}
 
-	err := nv.sign(JWT)
+	err := nv.sign(jwt)
 
 	if err != nil {
 		t.Errorf("Didn't expect nonevalidator.Sign to return an error: %s", err)
 	}
 
-	if len(JWT.Signature) != 0 {
-		t.Errorf("Invalid signature from nonevalidator. Got %#v; Expected %#v", JWT.Signature, []byte(""))
+	if len(jwt.Signature) != 0 {
+		t.Errorf("Invalid signature from nonevalidator. Got %#v; Expected %#v", jwt.Signature, []byte(""))
 	}
 }

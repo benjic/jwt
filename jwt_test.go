@@ -24,8 +24,8 @@ var ErrTestValidator = errors.New("A fake validator error")
 
 type TestValidator struct{}
 
-func (v TestValidator) sign(jwt *JWT) error             { return ErrTestValidator }
-func (v TestValidator) validate(jwt *JWT) (bool, error) { return false, ErrTestValidator }
+func (v TestValidator) sign(jwt *jwt) error             { return ErrTestValidator }
+func (v TestValidator) validate(jwt *jwt) (bool, error) { return false, ErrTestValidator }
 
 func TestDecodeErrors(t *testing.T) {
 	cases := []struct {

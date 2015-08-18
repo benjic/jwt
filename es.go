@@ -54,7 +54,7 @@ func NewESValidator(algorithm Algorithm) (v ESValidator, err error) {
 	}
 }
 
-func (v ESValidator) sign(jwt *JWT) (err error) {
+func (v ESValidator) sign(jwt *jwt) (err error) {
 	if v.PrivateKey == nil {
 		return errors.New("Cannot sign with a nil private key")
 	}
@@ -77,7 +77,7 @@ func (v ESValidator) sign(jwt *JWT) (err error) {
 	return err
 }
 
-func (v ESValidator) validate(jwt *JWT) (bool, error) {
+func (v ESValidator) validate(jwt *jwt) (bool, error) {
 	r := new(big.Int)
 	s := new(big.Int)
 
