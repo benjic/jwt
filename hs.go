@@ -69,10 +69,10 @@ func (v hsValidator) validate(jwt *jwt) (bool, error) {
 func (v hsValidator) sign(jwt *jwt) error {
 
 	jwt.Header.Algorithm = v.algorithm
-	jwt.rawEncode()
+	header, payload := jwt.rawEncode()
 
 	mac := hmac.New(v.hashFunc, v.Key)
-	mac.Write([]byte(strings.Trim(string(jwt.headerRaw), "=") + "." + strings.Trim(string(jwt.payloadRaw), "=")))
+	mac.Write([]byte(string(header) + "." + string(payload)))
 
 	jwt.Signature = []byte(base64.URLEncoding.EncodeToString(mac.Sum(nil)))
 	return nil

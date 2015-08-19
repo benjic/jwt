@@ -60,11 +60,11 @@ func (v ESValidator) sign(jwt *jwt) (err error) {
 	}
 
 	jwt.Header.Algorithm = v.algorithm
-	jwt.rawEncode()
+	header, payload := jwt.rawEncode()
 
 	// TODO: This block is general. Refactor it out of RS and ES validators
 	hsh := v.hashType.New()
-	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
+	hsh.Write([]byte(string(header) + "." + string(payload)))
 	hash := hsh.Sum(nil)
 
 	r, s, err := ecdsa.Sign(v.rand, v.PrivateKey, hash)

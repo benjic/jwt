@@ -72,11 +72,10 @@ func (v nonevalidator) sign(jwt *jwt) error {
 	return nil
 }
 
-func (jwt *jwt) rawEncode() {
+func (jwt *jwt) rawEncode() (header, payload []byte) {
 	headerBuf := bytes.NewBuffer(nil)
 	payloadBuf := bytes.NewBuffer(nil)
 
-	// TODO: Determine if errors here are possible/relevant
 	json.NewEncoder(headerBuf).Encode(jwt.Header)
 	json.NewEncoder(payloadBuf).Encode(jwt.Payload)
 
@@ -86,12 +85,14 @@ func (jwt *jwt) rawEncode() {
 	json.Compact(compactHeaderBuf, headerBuf.Bytes())
 	json.Compact(compactPayloadBuf, payloadBuf.Bytes())
 
-	jwt.headerRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
-	jwt.payloadRaw = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
+	header = make([]byte, base64.URLEncoding.EncodedLen(len(compactHeaderBuf.Bytes())))
+	payload = make([]byte, base64.URLEncoding.EncodedLen(len(compactPayloadBuf.Bytes())))
 
-	base64.URLEncoding.Encode(jwt.headerRaw, compactHeaderBuf.Bytes())
-	base64.URLEncoding.Encode(jwt.payloadRaw, compactPayloadBuf.Bytes())
+	base64.URLEncoding.Encode(header, compactHeaderBuf.Bytes())
+	base64.URLEncoding.Encode(payload, compactPayloadBuf.Bytes())
 
-	jwt.headerRaw = []byte(strings.Trim(string(jwt.headerRaw), "="))
-	jwt.payloadRaw = []byte(strings.Trim(string(jwt.payloadRaw), "="))
+	header = []byte(strings.Trim(string(header), "="))
+	payload = []byte(strings.Trim(string(payload), "="))
+
+	return header, payload
 }
