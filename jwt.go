@@ -44,7 +44,6 @@ type Payload struct {
 	NotBefore      *time.Time `json:"nbf,omitempty"`
 	IssuedAt       *time.Time `json:"iat,omitempty"`
 	JWTId          string     `json:"jti,omitempty"`
-	raw            []byte
 }
 
 // A Decoder is a centeralized reader and key used to consume and verify a
@@ -66,19 +65,16 @@ type Encoder struct {
 type header struct {
 	Algorithm   Algorithm `json:"alg"`
 	ContentType string    `json:"typ"`
-	raw         []byte
 }
 
 // A jwt is a unified structure of the components of a jwt. This structure is
 //used internally to aggregate components during encoding and decoding.
 type jwt struct {
-	Header            *header
-	headerRaw         []byte
-	Payload           interface{}
-	claimsPayload     *Payload
-	payloadRaw        []byte
-	registeredPayload Payload
-	Signature         []byte
+	Header     *header
+	headerRaw  []byte
+	Payload    interface{}
+	payloadRaw []byte
+	Signature  []byte
 }
 
 // NewDecoder creates an underlying Decoder with a given key and input reader
@@ -91,7 +87,8 @@ func NewDecoder(r io.Reader, v Validator) *Decoder {
 // of the given token is verified and will return an error if a bad signature is
 // found. In addition if the jwt is using an unimplemented algorithm an error will
 // be returned as well.
-func (dec *Decoder) Decode(v interface{}) error {
+func (dec *Decoder) Decode(v interface{}) (err error) {
+	var valid bool
 
 	buf := bufio.NewReader(dec.reader)
 	input, err := buf.ReadString(byte(' '))
@@ -102,16 +99,16 @@ func (dec *Decoder) Decode(v interface{}) error {
 		return err
 	}
 
-	if valid, err := dec.validator.validate(jwt); !valid || err != nil {
+	if valid, err = dec.validator.validate(jwt); !valid || err != nil {
 
 		if err != nil {
 			return err
 		}
 
-		return ErrBadSignature
+		err = ErrBadSignature
 	}
 
-	return nil
+	return err
 }
 
 // NewEncoder creates an underlying Encoder with a given key and output writer
@@ -135,7 +132,9 @@ func (enc *Encoder) Encode(v interface{}) error {
 		return err
 	}
 
-	fmt.Fprintf(enc.writer, "%s", jwt.token())
+	header, payload := jwt.rawEncode()
+
+	fmt.Fprintf(enc.writer, "%s.%s.%s", string(header), string(payload), string(jwt.Signature))
 
 	return nil
 }
@@ -144,7 +143,7 @@ func (jwt *jwt) parseHeader(raw string) error {
 	var err error
 	var value []byte
 
-	if value, err = parseField(raw); err != nil {
+	if value, err = padB64String(raw); err != nil {
 		return err
 	}
 
@@ -160,8 +159,7 @@ func (jwt *jwt) parseHeader(raw string) error {
 func parseJWT(input string, payload interface{}) (*jwt, error) {
 	var err error
 	jwt := &jwt{
-		Header:        &header{},
-		claimsPayload: &Payload{},
+		Header: &header{},
 	}
 
 	fields := strings.Split(input, ".")
@@ -183,35 +181,18 @@ func parseJWT(input string, payload interface{}) (*jwt, error) {
 	return jwt, nil
 }
 
-func (jwt *jwt) token() string {
-	header := strings.Trim(string(jwt.headerRaw), "=")
-	payload := strings.Trim(string(jwt.payloadRaw), "=")
-	signature := strings.Trim(string(jwt.Signature), "=")
-
-	return fmt.Sprintf("%s.%s.%s", header, payload, signature)
-}
-
-func (jwt *jwt) parsePayload(raw string, v interface{}) error {
+func (jwt *jwt) parsePayload(raw string, v interface{}) (err error) {
 	jwt.payloadRaw = []byte(raw)
-	value, err := parseField(raw)
+	value, err := padB64String(raw)
 
 	if err != nil {
 		return err
 	}
 
-	// TODO: How to deal with json encoder errors?
-	err = json.NewDecoder(bytes.NewReader(value)).Decode(v)
-
-	if err != nil {
-		return err
-	}
-
-	json.NewDecoder(bytes.NewReader(value)).Decode(jwt.claimsPayload)
-
-	return nil
+	return json.NewDecoder(bytes.NewReader(value)).Decode(v)
 }
 
-func parseField(b64Value string) ([]byte, error) {
+func padB64String(b64Value string) ([]byte, error) {
 	if m := len(b64Value) % 4; m != 0 {
 		b64Value += strings.Repeat("=", 4-m)
 	}

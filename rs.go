@@ -58,16 +58,16 @@ func (v RSValidator) validate(jwt *jwt) (bool, error) {
 	}
 
 	jwt.Header.Algorithm = v.algorithm
-	jwt.rawEncode()
+	header, payload := jwt.rawEncode()
 
 	signature, err := base64.URLEncoding.DecodeString(string(jwt.Signature))
 
 	if err != nil {
-		return false, err
+		return false, ErrMalformedToken
 	}
 
 	hsh := v.hashType.New()
-	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
+	hsh.Write([]byte(string(header) + "." + string(payload)))
 	hash := hsh.Sum(nil)
 
 	err = rsa.VerifyPKCS1v15(v.PublicKey, v.hashType, hash, signature)
@@ -81,10 +81,10 @@ func (v RSValidator) validate(jwt *jwt) (bool, error) {
 
 func (v RSValidator) sign(jwt *jwt) (err error) {
 	jwt.Header.Algorithm = v.algorithm
-	jwt.rawEncode()
+	header, payload := jwt.rawEncode()
 
 	hsh := v.hashType.New()
-	hsh.Write([]byte(string(jwt.headerRaw) + "." + string(jwt.payloadRaw)))
+	hsh.Write([]byte(string(header) + "." + string(payload)))
 	hash := hsh.Sum(nil)
 
 	signature, _ := rsa.SignPKCS1v15(v.randReader, v.PrivateKey, v.hashType, hash)

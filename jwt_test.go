@@ -133,9 +133,9 @@ func TestEncodingSigning(t *testing.T) {
 		Payload    interface{}
 		ValidToken string
 	}{
-		{HS256, struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto"},
+		{HS256, struct{}{}, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.UGgJ_8f7TlqazSojqRAKzMJ0SUWJCJJ_9jDHe5nrhto="},
 		{HS384, struct{}{}, "eyJhbGciOiJIUzM4NCIsInR5cCI6IkpXVCJ9.e30.YGfeZ7CN9vKz4M2SINxTixlpUEDqsCZNx4LMJK62Lr_Eiptnikcf5XfgDd_7eVWe"},
-		{HS512, struct{}{}, "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.e30.wHUM-6oRBExIgOk9MLOQ_80WqbuOmXXNuyTy4WmM_0WBM6pXld0mru8rZbc9-E314K9UhMkDNHbg2MRjIsCR3g"},
+		{HS512, struct{}{}, "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.e30.wHUM-6oRBExIgOk9MLOQ_80WqbuOmXXNuyTy4WmM_0WBM6pXld0mru8rZbc9-E314K9UhMkDNHbg2MRjIsCR3g=="},
 	}
 
 	for _, c := range cases {
@@ -178,11 +178,11 @@ func ExampleEncoder() {
 	}
 
 	fmt.Println(tokenBuffer.String())
-	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI
+	// Output: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI=
 }
 
 func ExampleDecoder() {
-	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI"
+	token := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJCZW4gQ2FtcGJlbGwiLCJhZG1pbiI6dHJ1ZSwidXNlcl9pZCI6MTIzNH0.r4W8qDl8i8cUcRUxtA3hM0SZsLScHiBgBKZc_n_GrXI="
 
 	payload := &struct {
 		Payload
@@ -200,5 +200,5 @@ func ExampleDecoder() {
 	}
 
 	fmt.Printf("%+v\n", payload)
-	// Output: &{Payload:{Issuer:Ben Campbell Subject: Audience: ExpirationTime:<nil> NotBefore:<nil> IssuedAt:<nil> JWTId: raw:[]} Admin:true UserID:1234}
+	// Output: &{Payload:{Issuer:Ben Campbell Subject: Audience: ExpirationTime:<nil> NotBefore:<nil> IssuedAt:<nil> JWTId:} Admin:true UserID:1234}
 }
